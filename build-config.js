@@ -57,7 +57,6 @@ module.exports = {
   files: [
     'main.js',
     'preload.js',
-    'python/**/*',
     'assets/**/*',
   ],
   /* Node modules — 自动包含 dependencies，排除 devDependencies */
@@ -72,9 +71,6 @@ module.exports = {
 
   /* ──────── 打包后体积优化 ──────── */
   asar: true,
-  asarUnpack: [
-    'python/**',
-  ],
 
   /* ──────── 发布 ▸ GitHub Releases ──────── */
   /* CI 中通过 publish: always 启用，本地构建时使用 --publish=never */
