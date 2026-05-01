@@ -9,9 +9,6 @@
     "build:win": "electron-builder --win --config build-config.js",
     "build:all": "electron-builder --mac --win --config build-config.js"
   },
-  "dependencies": {
-    "electron-store": "^10.0.0"
-  },
   "devDependencies": {
     "electron": "^41.4.0",
     "electron-builder": "^25.0.0",
