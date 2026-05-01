@@ -8,9 +8,8 @@ module.exports = {
   /* ──────── Mac ──────── */
   mac: {
     category: 'public.app-category.productivity',
-    target: [
-      { target: 'dmg', arch: ['x64', 'arm64'] },
-    ],
+    /* arch 通过 CLI --x64 / --arm64 指定 */
+    target: ['dmg'],
     icon: 'assets/icon.png',
     hardenedRuntime: true,
     extendInfo: {

@@ -13,54 +13,41 @@ on:
 
 jobs:
   # ──── Mac 构建 (Intel + Apple Silicon) ────
-  build-mac:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
-
+  build-mac-x64:
+    runs-on: macos-13
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: 安装依赖
-        run: npm install
-        working-directory: .
-
-      - name: 设置 Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 安装 Python + Playwright 依赖
-        run: |
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm install
+      - run: |
           pip install -r python/requirements.txt
           python -m playwright install chromium
-        working-directory: .
-
-      - name: 验证 Playwright 可用 (mac)
-        run: python -c "import playwright; from playwright.sync_api import sync_playwright; print('playwright ok')"
-
-      - name: 构建 Mac (${{ matrix.arch }})
-        run: npm run build:mac -- --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 以下签名证书环境变量可选 — 没有时 Electron Builder 会自动跳过签名
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: 上传安装包 (Mac)
-        uses: actions/upload-artifact@v4
+      - name: 构建 Mac (x64)
+        run: npx electron-builder --mac --x64 --config build-config.js --publish=never
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: actions/upload-artifact@v4
         with:
-          name: liepin-client-mac-${{ matrix.arch }}
+          name: liepin-client-mac-x64
+          path: dist/*.dmg
+          if-no-files-found: warn
+
+  build-mac-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm install
+      - run: |
+          pip install -r python/requirements.txt
+          python -m playwright install chromium
+      - name: 构建 Mac (arm64)
+        run: npx electron-builder --mac --arm64 --config build-config.js --publish=never
+        env: { GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: liepin-client-mac-arm64
           path: dist/*.dmg
           if-no-files-found: warn
 
@@ -110,7 +97,7 @@ jobs:
 
   # ──── 发布到 GitHub Releases ────
   release:
-    needs: [build-mac, build-win]
+    needs: [build-mac-x64, build-mac-arm64, build-win]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
