@@ -1,0 +1,157 @@
+name: 构建 & 发布
+
+on:
+  push:
+    tags:
+      - 'v*'        # 推送 v1.0.0, v2.0-beta 等 tag 时自动构建
+  workflow_dispatch:       # 也支持手动触发
+    inputs:
+      version:
+        description: '版本号 (例如 1.0.1)'
+        required: false
+        default: ''
+
+jobs:
+  # ──── Mac 构建 (Intel + Apple Silicon) ────
+  build-mac:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm ci
+        working-directory: .
+
+      - name: 设置 Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装 Python + Playwright 依赖
+        run: |
+          pip install -r python/requirements.txt
+          python -m playwright install chromium
+          python -m playwright install-deps
+        working-directory: .
+
+      - name: 验证 Playwright 可用
+        run: python python/run_playwright.py check
+
+      - name: 构建 Mac (${{ matrix.arch }})
+        run: npm run build:mac
+        env:
+          ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: 上传安装包 (Mac)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liepin-client-mac-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: warn
+
+  # ──── Windows 构建 ────
+  build-win:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm ci
+        working-directory: .
+
+      - name: 设置 Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装 Python + Playwright 依赖
+        run: |
+          pip install -r python/requirements.txt
+          python -m playwright install chromium
+        working-directory: .
+
+      - name: 验证 Playwright 可用
+        run: python python/run_playwright.py check
+
+      - name: 构建 Win
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+
+      - name: 上传安装包 (Win)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liepin-client-win-x64
+          path: dist/*.exe
+          if-no-files-found: warn
+
+  # ──── 发布到 GitHub Releases ────
+  release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 整理文件
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.zip" \) -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
+      - name: 创建 Release 并上传
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**
+          draft: true
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          name: 猎聘客户端 ${{ github.ref_name }}
+          body: |
+            ## 猎聘客户端 v${{ github.ref_name }}
+
+            ### 功能
+            - 🚀 继承本机 Chrome 登录态，打开即用
+            - 🔍 内置 Playwright 自动化搜索（Python 引擎）
+            - 🎯 支持候选人搜索、截图、数据导出
+
+            ### 文件说明
+            | 文件 | 说明 |
+            |------|------|
+            | `liepin-client-x.x.x.dmg` | macOS Intel / Apple Silicon |
+            | `liepin-client-x.x.x.exe` | Windows x64 安装包 |
+
+            ### 系统要求
+            - **macOS**: macOS 12+ (Monterey 及以上)
+            - **Windows**: Windows 10/11 x64
+            - **Chrome**: 需已安装 Chrome 浏览器（用于继承登录态）
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
