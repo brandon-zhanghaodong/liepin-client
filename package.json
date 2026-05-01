@@ -2,6 +2,8 @@
   "name": "liepin-client",
   "version": "1.0.0",
   "description": "猎聘客户端 - 继承本机Chrome登录态，零配置启动 + Playwright自动化搜索",
+"author": "Brandon Zhang <zhanghaodong@aliyun.com>",
+"license": "MIT",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
