@@ -29,7 +29,7 @@ jobs:
           node-version: 22
 
       - name: 安装依赖
-        run: npm ci
+        run: npm install
         working-directory: .
 
       - name: 设置 Python 3
@@ -50,8 +50,8 @@ jobs:
       - name: 构建 Mac (${{ matrix.arch }})
         run: npm run build:mac
         env:
-          ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 以下签名证书环境变量可选 — 没有时 Electron Builder 会自动跳过签名
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -79,7 +79,7 @@ jobs:
           node-version: 22
 
       - name: 安装依赖
-        run: npm ci
+        run: npm install
         working-directory: .
 
       - name: 设置 Python 3
