@@ -36,12 +36,14 @@ def main():
         """检查 Playwright 安装状态"""
         try:
             import playwright
-            ver = playwright.__version__
-            # 检查浏览器
             from playwright.sync_api import sync_playwright
+            import pkg_resources
+            ver = pkg_resources.get_distribution("playwright").version
             msg = f'{{"status":"ok","version":"{ver}"}}'
             print(msg, flush=True)
         except ImportError as e:
+            print(f'{{"status":"error","message":"{str(e)}"}}', flush=True)
+        except Exception as e:
             print(f'{{"status":"error","message":"{str(e)}"}}', flush=True)
 
     elif action == "install":
