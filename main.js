@@ -240,7 +240,7 @@ function runPythonScript(scriptName, args = []) {
  */
 async function checkPlaywright() {
   try {
-    const result = await runPythonScript('run_playwright.py', ['check']);
+    const result = await runPythonScript('liepin_check_login.py');
     return result;
   } catch (err) {
     return { status: 'error', message: err.message };
@@ -248,11 +248,16 @@ async function checkPlaywright() {
 }
 
 /**
- * 安装 Playwright 浏览器
+ * 执行猎聘候选人搜索（基于已有脚本 liepin_search.py / liepin_search_v2.py）
  */
-async function installPlaywrightBrowser() {
+async function searchLiepin(keyword = 'CTO', maxResults = 50, cdpPort = 9222) {
   try {
-    const result = await runPythonScript('run_playwright.py', ['install']);
+    // 使用 liepin_search.py（已连接 CDP 的版本），传递搜索关键词
+    const result = await runPythonScript('liepin_search.py', [
+      '--keywords', keyword,
+      '--max', String(maxResults),
+      '--port', String(cdpPort),
+    ]);
     return result;
   } catch (err) {
     return { status: 'error', message: err.message };
@@ -260,14 +265,12 @@ async function installPlaywrightBrowser() {
 }
 
 /**
- * 执行猎聘搜索
+ * 检查猎聘登录态
  */
-async function searchLiepin(keyword, maxResults = 50) {
+async function checkLiepinLogin(profilePath) {
   try {
-    const result = await runPythonScript('run_playwright.py', [
-      'search',
-      keyword,
-      String(maxResults),
+    const result = await runPythonScript('liepin_check_login.py', [
+      profilePath || '',
     ]);
     return result;
   } catch (err) {
@@ -285,20 +288,11 @@ ipcMain.handle('playwright:check', async () => {
   return await checkPlaywright();
 });
 
-ipcMain.handle('playwright:install', async () => {
-  return await installPlaywrightBrowser();
-});
-
 ipcMain.handle('playwright:search', async (_event, keyword, maxResults) => {
   return await searchLiepin(keyword, maxResults);
 });
 
-ipcMain.handle('playwright:snapshot', async () => {
-  const outPath = path.join(app.getPath('documents'), `liepin_snapshot_${Date.now()}.png`);
-  try {
-    const result = await runPythonScript('run_playwright.py', ['snapshot', '9222', outPath]);
-    return { status: 'ok', path: outPath };
-  } catch (err) {
-    return { status: 'error', message: err.message };
-  }
+ipcMain.handle('liepin:check-login', async () => {
+  const profileDir = getAppProfileDir();
+  return await checkLiepinLogin(profileDir);
 });
