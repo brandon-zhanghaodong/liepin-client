@@ -47,7 +47,7 @@ jobs:
         run: python -c "import playwright; from playwright.sync_api import sync_playwright; print('playwright ok')"
 
       - name: 构建 Mac (${{ matrix.arch }})
-        run: npm run build:mac
+        run: npm run build:mac -- --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 以下签名证书环境变量可选 — 没有时 Electron Builder 会自动跳过签名
@@ -96,7 +96,7 @@ jobs:
         run: python -c "import playwright; from playwright.sync_api import sync_playwright; print('playwright ok')"
 
       - name: 构建 Win
-        run: npm run build:win
+        run: npm run build:win -- --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}

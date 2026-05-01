@@ -77,10 +77,6 @@ module.exports = {
   ],
 
   /* ──────── 发布 ▸ GitHub Releases ──────── */
-  publish: {
-    provider: 'github',
-    owner: 'tdai-talent-ai',
-    repo: 'liepin-client',
-    releaseType: 'draft',
-  },
+  /* CI 中通过 publish: always 启用，本地构建时使用 --publish=never */
+  publish: null,
 };
