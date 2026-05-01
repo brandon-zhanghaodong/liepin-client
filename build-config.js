@@ -57,14 +57,11 @@ module.exports = {
   files: [
     'main.js',
     'preload.js',
-    'capture.js',
-    'build-config.js',
     'python/**/*',
     'assets/**/*',
-    'node_modules/**/*',
-    '!node_modules/electron/**',
-    '!node_modules/electron-builder/**',
   ],
+  /* Node modules — 自动包含 dependencies，排除 devDependencies */
+  /* electron-builder 默认会自动处理 node_modules */
   extraResources: [
     {
       from: 'python',
