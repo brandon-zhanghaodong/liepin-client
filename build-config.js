@@ -10,7 +10,7 @@ module.exports = {
     category: 'public.app-category.productivity',
     /* arch 通过 CLI --x64 / --arm64 指定 */
     target: ['dmg'],
-    icon: 'assets/icon.png',
+    icon: 'assets/icon.icns',
     hardenedRuntime: true,
     extendInfo: {
       LSUIElement: true,

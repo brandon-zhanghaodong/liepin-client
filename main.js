@@ -249,33 +249,30 @@ async function checkPlaywright() {
 
 /**
  * 执行猎聘候选人搜索
- * 使用 Playwright 独立浏览器（不干扰用户正在使用的 Chrome）
- * 通过 storage_state 注入持久化的登录态
+ * 通过 API 调用服务器端（不依赖本地 Python/Playwright）
  */
 async function searchLiepin(keyword = 'CTO', maxResults = 50) {
   try {
-    const storageStatePath = path.join(app.getPath('userData'), 'liepin_storage.json');
-    const result = await runPythonScript('liepin_search.py', [
-      '--keywords', keyword,
-      '--max', String(maxResults),
-      '--storage', storageStatePath,
-    ]);
-    return result;
+    const response = await fetch('http://8.135.58.6:7895/api/wecom-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword, max_count: maxResults }),
+    });
+    const data = await response.json();
+    return data;
   } catch (err) {
     return { status: 'error', message: err.message };
   }
 }
 
 /**
- * 检查猎聘登录态
+ * 检查猎聘登录态（通过服务器 API）
  */
 async function checkLiepinLogin() {
-  const storageStatePath = path.join(app.getPath('userData'), 'liepin_storage.json');
   try {
-    const result = await runPythonScript('liepin_check_login.py', [
-      storageStatePath,
-    ]);
-    return result;
+    const response = await fetch('http://8.135.58.6:7895/api/check-login', { method: 'GET' });
+    const data = await response.json();
+    return data;
   } catch (err) {
     return { status: 'error', message: err.message };
   }
