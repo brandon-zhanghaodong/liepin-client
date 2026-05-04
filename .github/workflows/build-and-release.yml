@@ -17,8 +17,10 @@ jobs:
       - run: npm install
       - name: 安装 Python + Playwright
         run: |
-          pip3 install -r python/requirements.txt
-          python3 -m playwright install chromium
+          pip3 install -r python/requirements.txt --break-system-packages 2>/dev/null || pip3 install -r python/requirements.txt
+          python3 -m playwright install chromium --with-deps 2>/dev/null || python3 -m playwright install chromium
+      - name: 验证 Playwright
+        run: python3 -c "from playwright.sync_api import sync_playwright; print('playwright ok')"
       - name: 构建 Mac (x64)
         run: npx electron-builder --mac --x64 --config build-config.js --publish=never
         env:
@@ -39,8 +41,11 @@ jobs:
       - run: npm install
       - name: 安装 Python + Playwright
         run: |
-          pip3 install -r python/requirements.txt
-          python3 -m playwright install chromium
+          # macOS arm64 runner has system python, install deps
+          pip3 install -r python/requirements.txt --break-system-packages 2>/dev/null || pip3 install -r python/requirements.txt
+          python3 -m playwright install chromium --with-deps 2>/dev/null || python3 -m playwright install chromium
+      - name: 验证 Playwright
+        run: python3 -c "from playwright.sync_api import sync_playwright; print('playwright ok')"
       - name: 构建 Mac (arm64)
         run: npx electron-builder --mac --arm64 --config build-config.js --publish=never
         env:
