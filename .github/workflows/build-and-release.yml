@@ -3,16 +3,11 @@ name: 构建 & 发布
 on:
   push:
     tags:
-      - 'v*'        # 推送 v1.0.0, v2.0-beta 等 tag 时自动构建
-  workflow_dispatch:       # 也支持手动触发
-    inputs:
-      version:
-        description: '版本号 (例如 1.0.1)'
-        required: false
-        default: ''
+      - 'v*'             # 推送 v1.0.0, v1.1.0 等 tag 时自动构建
+  workflow_dispatch:      # 手动触发
 
 jobs:
-  # ──── Mac 构建 (Intel + Apple Silicon) ────
+  # ──── Mac 构建 (Intel x64) ────
   build-mac-x64:
     runs-on: macos-13
     steps:
@@ -20,9 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - run: npm install
-      - run: |
-          pip install -r python/requirements.txt
-          python -m playwright install chromium
+      - name: 安装 Python + Playwright
+        run: |
+          pip3 install -r python/requirements.txt
+          python3 -m playwright install chromium
       - name: 构建 Mac (x64)
         run: npx electron-builder --mac --x64 --config build-config.js --publish=never
         env:
@@ -33,6 +29,7 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: warn
 
+  # ──── Mac 构建 (Apple Silicon) ────
   build-mac-arm64:
     runs-on: macos-latest
     steps:
@@ -40,9 +37,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - run: npm install
-      - run: |
-          pip install -r python/requirements.txt
-          python -m playwright install chromium
+      - name: 安装 Python + Playwright
+        run: |
+          pip3 install -r python/requirements.txt
+          python3 -m playwright install chromium
       - name: 构建 Mac (arm64)
         run: npx electron-builder --mac --arm64 --config build-config.js --publish=never
         env:
@@ -56,42 +54,25 @@ jobs:
   # ──── Windows 构建 ────
   build-win:
     runs-on: windows-latest
-
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: 安装依赖
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: 安装 npm 依赖
         run: npm install
-        working-directory: .
-
-      - name: 设置 Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 安装 Python + Playwright 依赖
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: 安装 Python + Playwright
         run: |
           pip install -r python/requirements.txt
           python -m playwright install chromium
-        working-directory: .
-
-      - name: 验证 Playwright 可用 (win)
+      - name: 验证 Playwright
         run: python -c "import playwright; from playwright.sync_api import sync_playwright; print('playwright ok')"
-
       - name: 构建 Win
         run: npm run build:win -- --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-
-      - name: 上传安装包 (Win)
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: liepin-client-win-x64
           path: dist/*.exe
@@ -104,42 +85,58 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - name: 下载所有构建产物
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: 整理文件
+      - name: 整理文件并重命名
         run: |
           mkdir -p release-assets
-          find artifacts -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.zip" \) -exec cp {} release-assets/ \;
+          # Mac builds
+          for f in artifacts/liepin-client-mac-x64/*.dmg; do
+            [ -f "$f" ] && cp "$f" "release-assets/招聘工厂客户端-Mac-x64-${GITHUB_REF_NAME}.dmg"
+          done
+          for f in artifacts/liepin-client-mac-arm64/*.dmg; do
+            [ -f "$f" ] && cp "$f" "release-assets/招聘工厂客户端-Mac-arm64-${GITHUB_REF_NAME}.dmg"
+          done
+          # Windows build
+          for f in artifacts/liepin-client-win-x64/*.exe; do
+            [ -f "$f" ] && cp "$f" "release-assets/招聘工厂客户端-Win-${GITHUB_REF_NAME}.exe"
+          done
+          echo "=== 发布文件 ==="
           ls -lh release-assets/
 
-      - name: 创建 Release 并上传
+      - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/**
-          draft: true
+          draft: false
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
-          name: 猎聘客户端 ${{ github.ref_name }}
+          name: 招聘工厂客户端 ${{ github.ref_name }}
           body: |
-            ## 猎聘客户端 v${{ github.ref_name }}
+            ## 招聘工厂客户端 v${{ github.ref_name }}
 
-            ### 功能
-            - 🚀 继承本机 Chrome 登录态，打开即用
-            - 🔍 内置 Playwright 自动化搜索（Python 引擎）
-            - 🎯 支持候选人搜索、截图、数据导出
+            ### 🚀 核心功能
+            - **独立浏览器架构** - 启动独立 Chromium，不干扰用户正在使用的 Chrome
+            - **登录态持久化** - 首次登录一次，后续自动携带
+            - **7×24h 猎聘搜索** - 支持批量关键词、AI评分、多平台同步
 
-            ### 文件说明
-            | 文件 | 说明 |
+            ### 📥 下载
+            | 平台 | 文件 |
             |------|------|
-            | `liepin-client-x.x.x.dmg` | macOS Intel / Apple Silicon |
-            | `liepin-client-x.x.x.exe` | Windows x64 安装包 |
+            | macOS Intel | `招聘工厂客户端-Mac-x64-${{ github.ref_name }}.dmg` |
+            | macOS Apple Silicon | `招聘工厂客户端-Mac-arm64-${{ github.ref_name }}.dmg` |
+            | Windows x64 | `招聘工厂客户端-Win-${{ github.ref_name }}.exe` |
 
-            ### 系统要求
-            - **macOS**: macOS 12+ (Monterey 及以上)
-            - **Windows**: Windows 10/11 x64
-            - **Chrome**: 需已安装 Chrome 浏览器（用于继承登录态）
+            ### ⚡ 使用
+            1. 下载对应平台的安装包
+            2. 安装后打开，输入搜索关键词
+            3. 首次使用需在独立浏览器中登录猎聘账号一次
+            4. 后续直接搜索，无需重复登录
+
+            ### 🛠️ 系统要求
+            - macOS 12+ / Windows 10/11
+            - 无需安装 Chrome（自带内置浏览器引擎）
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
