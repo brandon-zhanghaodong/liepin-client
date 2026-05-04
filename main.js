@@ -248,15 +248,17 @@ async function checkPlaywright() {
 }
 
 /**
- * 执行猎聘候选人搜索（基于已有脚本 liepin_search.py / liepin_search_v2.py）
+ * 执行猎聘候选人搜索
+ * 使用 Playwright 独立浏览器（不干扰用户正在使用的 Chrome）
+ * 通过 storage_state 注入持久化的登录态
  */
-async function searchLiepin(keyword = 'CTO', maxResults = 50, cdpPort = 9222) {
+async function searchLiepin(keyword = 'CTO', maxResults = 50) {
   try {
-    // 使用 liepin_search.py（已连接 CDP 的版本），传递搜索关键词
+    const storageStatePath = path.join(app.getPath('userData'), 'liepin_storage.json');
     const result = await runPythonScript('liepin_search.py', [
       '--keywords', keyword,
       '--max', String(maxResults),
-      '--port', String(cdpPort),
+      '--storage', storageStatePath,
     ]);
     return result;
   } catch (err) {
@@ -267,10 +269,11 @@ async function searchLiepin(keyword = 'CTO', maxResults = 50, cdpPort = 9222) {
 /**
  * 检查猎聘登录态
  */
-async function checkLiepinLogin(profilePath) {
+async function checkLiepinLogin() {
+  const storageStatePath = path.join(app.getPath('userData'), 'liepin_storage.json');
   try {
     const result = await runPythonScript('liepin_check_login.py', [
-      profilePath || '',
+      storageStatePath,
     ]);
     return result;
   } catch (err) {
@@ -293,6 +296,5 @@ ipcMain.handle('playwright:search', async (_event, keyword, maxResults) => {
 });
 
 ipcMain.handle('liepin:check-login', async () => {
-  const profileDir = getAppProfileDir();
-  return await checkLiepinLogin(profileDir);
+  return await checkLiepinLogin();
 });

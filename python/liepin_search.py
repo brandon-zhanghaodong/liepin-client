@@ -120,16 +120,27 @@ def get_search_box_coords(page):
         return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }""")
 
-def search_liepin(keyword):
+def search_liepin(keyword, storage_state_path=None):
+    import json, os
+    if storage_state_path is None:
+        storage_state_path = os.path.expanduser("~/.openclaw/browser/liepin_storage.json")
+    
     with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{PORT}")
-        ctx = browser.contexts[0]
-
-        # 使用找人页面 tab
-        if len(ctx.pages) > 2:
-            page = ctx.pages[2]
-        else:
-            page = ctx.new_page()
+        saved_cookies = []
+        if os.path.exists(storage_state_path):
+            with open(storage_state_path) as f:
+                saved_cookies = json.load(f).get("cookies", [])
+            print(f"  📥 加载 {len(saved_cookies)} 个 cookie（登录态）")
+        
+        browser = p.chromium.launch(
+            headless=False,
+            args=["--no-first-run", "--no-sandbox"],
+        )
+        ctx = browser.new_context()
+        if saved_cookies:
+            ctx.add_cookies(saved_cookies)
+        print(f"  ✅ 独立浏览器已启动")
+        page = ctx.new_page()
 
         # ── Step 1: 导航 ──────────────────────────────────────────────────
         print("[Step 1] 导航到搜索页...")
@@ -256,18 +267,17 @@ def save_and_import(candidates, keyword):
         print(f"     期望: {c['expect'].replace('求职期望：', '')}")
 
 def main():
-    if len(sys.argv) < 2:
-        print("用法: python3 liepin_search_connected.py <关键词>")
-        print("示例: python3 liepin_search_connected.py '字节跳动 HRD'")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="猎聘搜索")
+    parser.add_argument("keyword", nargs="?", default="CTO", help="搜索关键词")
+    parser.add_argument("--storage", type=str, default=None, help="storage state JSON 路径")
+    args = parser.parse_args()
 
-    keyword = sys.argv[1]
     print("=" * 60)
-    print(f"猎聘候选人搜索 | 关键词: {keyword}")
+    print(f"猎聘候选人搜索 | 关键词: {args.keyword}")
     print("=" * 60)
 
-    candidates = search_liepin(keyword)
-    save_and_import(candidates, keyword)
+    candidates = search_liepin(args.keyword, args.storage)
+    save_and_import(candidates, args.keyword)
 
     print("\n✅ 完成!")
 

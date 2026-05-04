@@ -12,16 +12,31 @@ PORT = 9222  # Chrome远程调试端口
 KW = "字节跳动 HRD"  # 默认搜索关键词
 OUT = Path(__file__).parent.parent / "candidates"
 
-def search_liepin(keyword, headless=False):
+def search_liepin(keyword, headless=False, storage_state_path=None):
+    import json, os
+    if storage_state_path is None:
+        storage_state_path = os.path.expanduser("~/.openclaw/browser/liepin_storage.json")
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     print("="*60)
     print(f"猎聘搜索: {keyword}")
     print("="*60)
     
     with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{PORT}")
-        context = browser.contexts[0]
-        page = context.new_page()
+        saved_cookies = []
+        if os.path.exists(storage_state_path):
+            with open(storage_state_path) as f:
+                saved_cookies = json.load(f).get("cookies", [])
+            print(f"  📥 加载 {len(saved_cookies)} 个 cookie（登录态）")
+        
+        browser = p.chromium.launch(
+            headless=False,
+            args=["--no-first-run", "--no-sandbox"],
+        )
+        ctx = browser.new_context()
+        if saved_cookies:
+            ctx.add_cookies(saved_cookies)
+        print(f"  ✅ 独立浏览器已启动")
+        page = ctx.new_page()
         
         # 打开找简历页面（猎头端的搜索页面）
         print("\n🌐 打开猎聘找简历页面...")
