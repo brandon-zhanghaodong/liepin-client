@@ -1,129 +1,11 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const fs = require('fs-extra');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
+const fs = require('fs');
 
 // —— 配置 ——
 const TARGET_URL = 'https://www.liepin.com/';
 const PLATFORM_NAME = '猎聘';
-
-// —— Python 运行时路径 ——
-function getPythonPath() {
-  // 打包后: <app>/Resources/python/bin/python3  (Mac)
-  //         <app>/resources/python/python.exe     (Win)
-  const isPackaged = app.isPackaged;
-  const resourcePath = isPackaged
-    ? path.join(process.resourcesPath, 'python')
-    : path.join(__dirname, 'python');
-
-  if (process.platform === 'win32') {
-    const embedded = path.join(resourcePath, 'python.exe');
-    if (fs.existsSync(embedded)) return embedded;
-    return 'python'; // fallback
-  }
-
-  // Mac / Linux — 打包后从 resources 取，开发模式从目录取
-  const bundled = path.join(resourcePath, 'bin', 'python3');
-  if (fs.existsSync(bundled)) return bundled;
-  return 'python3'; // fallback to system
-}
-
-function getScriptPath(name) {
-  return path.join(
-    app.isPackaged ? path.join(process.resourcesPath, 'python') : path.join(__dirname, 'python'),
-    name
-  );
-}
-
-// —— Chrome 用户数据目录 ——
-function getChromeUserDataDir() {
-  const home = app.getPath('home');
-  switch (process.platform) {
-    case 'darwin':
-      return path.join(home, '/Library/Application Support/Google/Chrome');
-    case 'win32':
-      return path.join(process.env.LOCALAPPDATA || '', '/Google/Chrome/User Data');
-    case 'linux':
-      return path.join(home, '/.config/google-chrome');
-    default:
-      return null;
-  }
-}
-
-function getAppProfileDir() {
-  return path.join(app.getPath('userData'), 'chrome-profile');
-}
-
-// —— 首次启动：镜像本机 Chrome Profile ——
-async function ensureProfile() {
-  const src = getChromeUserDataDir();
-  const dst = getAppProfileDir();
-
-  if (!src) {
-    console.warn('⚠️ 未知平台，使用空 profile');
-    return;
-  }
-
-  const srcExists = await fs.pathExists(src);
-  if (!srcExists) {
-    console.warn('⚠️ 未找到本机 Chrome 用户数据目录，将使用空 profile');
-    return;
-  }
-
-  const dstExists = await fs.pathExists(dst);
-  if (dstExists) {
-    console.log('✅ 使用已有 Chrome profile 副本');
-    return;
-  }
-
-  console.log('📦 首次启动：正在复制 Chrome 用户数据...');
-
-  const itemsToCopy = [
-    'Default', 'Profile 1', 'Profile 2', 'Profile 3', 'Profile 4', 'Profile 5',
-    'Local State', 'Bookmarks', 'Login Data', 'Cookies',
-    'Network Persistent State', 'Preferences', 'Secure Preferences',
-  ];
-
-  let profiles = ['Default'];
-  try {
-    const ls = await fs.readdir(src);
-    profiles = ls.filter(x => x.startsWith('Profile ') || x === 'Default');
-  } catch (_) { /* 忽略 */ }
-
-  profiles.forEach(p => {
-    if (!itemsToCopy.includes(p)) itemsToCopy.push(p);
-  });
-
-  const skipDirs = new Set([
-    'Cache', 'Code Cache', 'Service Worker', 'GPUCache',
-    'DawnCache', 'ShaderCache', 'Crashpad', 'GrShaderCache',
-    'GraphiteDawnCache', 'component_crx_cache',
-    'File System', 'IndexedDB', 'Extensions', 'PepperFlash', 'WidevineCdm',
-  ]);
-
-  for (const item of itemsToCopy) {
-    const srcPath = path.join(src, item);
-    const dstPath = path.join(dst, item);
-    try {
-      const stat = await fs.stat(srcPath);
-      if (stat.isDirectory()) {
-        if (skipDirs.has(item)) continue;
-        await fs.copy(srcPath, dstPath, {
-          filter: (p) => {
-            const name = path.basename(p);
-            return !skipDirs.has(name);
-          }
-        });
-      } else if (stat.isFile()) {
-        await fs.copy(srcPath, dstPath);
-      }
-    } catch (err) {
-      console.warn(`⚠️  跳过 ${item}: ${err.message}`);
-    }
-  }
-
-  console.log('✅ Chrome profile 复制完成');
-}
 
 // —— 创建主窗口 ——
 let mainWindow = null;
@@ -156,14 +38,7 @@ function createWindow() {
 }
 
 // —— 启动 ——
-app.whenReady().then(async () => {
-  await ensureProfile();
-
-  const profileDir = getAppProfileDir();
-  app.commandLine.appendSwitch('user-data-dir', profileDir);
-  app.commandLine.appendSwitch('enable-features', 'NetworkService,NetworkServiceInProcess');
-  app.commandLine.appendSwitch('disable-features', 'ChromeWhatsNewUI');
-
+app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {

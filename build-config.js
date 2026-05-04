@@ -10,7 +10,7 @@ module.exports = {
     category: 'public.app-category.productivity',
     /* arch 通过 CLI --x64 / --arm64 指定 */
     target: ['dmg'],
-    icon: 'assets/icon.icns',
+    icon: 'assets/icon.png',
     hardenedRuntime: true,
     extendInfo: {
       LSUIElement: true,
@@ -32,9 +32,11 @@ module.exports = {
   },
 
   /* ──────── 打包内容 ──────── */
-  /* 不设 files 列表 — electron-builder 默认会自动检测 main + node_modules */
-  extraResources: [
-    { from: 'python', to: 'python' },
+  files: [
+    'main.js',
+    'preload.js',
+    'assets/**/*',
+    'node_modules/**/*',
   ],
 
   asar: true,
