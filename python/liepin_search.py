@@ -13,13 +13,13 @@
   python3 liepin_search_connected.py "人工智能 CTO"
 """
 
-import time, csv, sys, requests, json
+import time, csv, sys, requests, json, argparse
 from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 PORT = 9222
-OUT = Path(__file__).parent.parent / "candidates"
+OUT = Path.home() / ".liepin_candidates"
 BITABLE = ("WXHObDl8eahIVEs06phcpzPDncb", "tblxmUAD1XrA4XTP")
 CANDIDATE_SELECTOR = ".tlog-common-resume-card"
 MAX_RETRIES = 2  # 每个步骤最多重试次数
@@ -238,6 +238,7 @@ def search_liepin(keyword, storage_state_path=None):
         return candidates
 
 def save_and_import(candidates, keyword):
+    OUT.mkdir(parents=True, exist_ok=True)
     if not candidates:
         print("❌ 没有候选人数据")
         return
@@ -270,6 +271,7 @@ def main():
     parser = argparse.ArgumentParser(description="猎聘搜索")
     parser.add_argument("keyword", nargs="?", default="CTO", help="搜索关键词")
     parser.add_argument("--storage", type=str, default=None, help="storage state JSON 路径")
+    parser.add_argument("--port", type=str, default="9222", help="(deprecated) 兼容旧版本")
     args = parser.parse_args()
 
     print("=" * 60)

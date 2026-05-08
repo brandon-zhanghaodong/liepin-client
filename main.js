@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 
 // —— 配置 ——
 const TARGET_URL = 'https://www.liepin.com/';
@@ -51,6 +52,22 @@ app.on('window-all-closed', () => {
 });
 
 // ============ IPC: Playwright / Python 自动化 ============
+
+/**
+ * 获取系统 Python 路径
+ */
+function getPythonPath() {
+  const candidates = ['python3', 'python'];
+  for (const cmd of candidates) {
+    try {
+      const out = execSync(`${cmd} --version`, { encoding: 'utf-8', timeout: 3000 });
+      if (out.toLowerCase().includes('python')) {
+        return cmd;
+      }
+    } catch {}
+  }
+  return 'python3'; // fallback
+}
 
 /**
  * 运行 Python Playwright 脚本并返回 JSON
@@ -111,43 +128,74 @@ function runPythonScript(scriptName, args = []) {
 }
 
 /**
- * 检查 Playwright 是否就绪
+ * 检查 Python + Playwright 环境
  */
 async function checkPlaywright() {
   try {
-    const result = await runPythonScript('liepin_check_login.py');
-    return result;
+    const pythonPath = getPythonPath();
+    const checkResult = execSync(`${pythonPath} -c "from playwright.sync_api import sync_playwright; print('ok')"`, {
+      timeout: 10000,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (checkResult.trim() === 'ok') {
+      return { status: 'ready', message: 'Playwright 就绪' };
+    }
+    return { status: 'error', message: 'Playwright 未正确安装' };
   } catch (err) {
-    return { status: 'error', message: err.message };
+    return { status: 'error', message: `Python/Playwright 检查失败: ${err.message}` };
   }
 }
 
 /**
- * 执行猎聘候选人搜索
- * 通过 API 调用服务器端（不依赖本地 Python/Playwright）
+ * 执行本地猎聘搜索
+ * 调用 Python 独立浏览器脚本，不走服务器
  */
 async function searchLiepin(keyword = 'CTO', maxResults = 50) {
+  console.log(`🔍 本地搜索: ${keyword} (最多${maxResults}人)`);
+  
   try {
-    const response = await fetch('http://8.135.58.6:7895/api/wecom-search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword, max_count: maxResults }),
-    });
-    const data = await response.json();
-    return data;
+    // 调用 Python 桥接脚本
+    const result = await runPythonScript('liepin_electron_search.py', [keyword, String(maxResults)]);
+    
+    if (result.status === 'ok') {
+      console.log(`✅ 搜索完成: ${result.count} 人`);
+      return result;
+    }
+    
+    return { status: 'error', message: result.message || '搜索结果为空' };
   } catch (err) {
-    return { status: 'error', message: err.message };
+    console.error(`❌ 搜索异常: ${err.message}`);
+    // 备用方案：尝试服务器 API
+    try {
+      console.log('⚠️  本地搜索失败，尝试服务器 API...');
+      const response = await fetch('http://8.135.58.6:7895/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, max_count: maxResults }),
+        signal: AbortSignal.timeout(60000),
+      });
+      const data = await response.json();
+      return data;
+    } catch (apiErr) {
+      return { status: 'error', message: `本地搜索失败: ${err.message}; 服务器回退也失败: ${apiErr.message}` };
+    }
   }
 }
 
 /**
- * 检查猎聘登录态（通过服务器 API）
+ * 检查猎聘登录态（本地检查）
  */
 async function checkLiepinLogin() {
+  // 检查本地存储的 cookie 文件
+  const storagePath = path.join(os.homedir(), '.liepin_client', 'liepin_storage.json');
   try {
-    const response = await fetch('http://8.135.58.6:7895/api/check-login', { method: 'GET' });
-    const data = await response.json();
-    return data;
+    if (fs.existsSync(storagePath)) {
+      const data = JSON.parse(fs.readFileSync(storagePath, 'utf-8'));
+      const count = (data.cookies || []).length;
+      return { status: count > 0 ? 'ok' : 'empty', cookieCount: count };
+    }
+    return { status: 'not_found', message: '未找到本地登录态' };
   } catch (err) {
     return { status: 'error', message: err.message };
   }

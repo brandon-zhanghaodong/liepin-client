@@ -10,10 +10,10 @@ from playwright.sync_api import sync_playwright
 
 PORT = 9222  # Chrome远程调试端口
 KW = "字节跳动 HRD"  # 默认搜索关键词
-OUT = Path(__file__).parent.parent / "candidates"
+OUT = Path.home() / ".liepin_candidates"
 
 def search_liepin(keyword, headless=False, storage_state_path=None):
-    import json, os
+    import json, os, argparse
     if storage_state_path is None:
         storage_state_path = os.path.expanduser("~/.openclaw/browser/liepin_storage.json")
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')

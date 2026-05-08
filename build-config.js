@@ -31,6 +31,15 @@ module.exports = {
     uninstallerIcon: 'assets/icon.ico',
   },
 
+  /* ──────── Python 脚本（extraResources，不会被打入 asar）── */
+  extraResources: [
+    {
+      from: 'python',
+      to: 'python',
+      filter: ['*.py', 'requirements.txt'],
+    }
+  ],
+
   /* ──────── 打包内容 ──────── */
   files: [
     'main.js',
