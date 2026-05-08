@@ -55,7 +55,7 @@ echo ""
 echo -e "${BOLD}下载搜索脚本...${RESET}"
 SCRIPT_DIR="$HOME/.liepin_client"
 mkdir -p "$SCRIPT_DIR"
-SCRIPT_URL="https://raw.githubusercontent.com/brandon-zhanghaodong/recruitment-factory-client/main/python/liepin_cli.py"
+SCRIPT_URL="https://raw.githubusercontent.com/brandon-zhanghaodong/liepin-client/refs/heads/main/python/liepin_cli.py"
 
 # 尝试下载，如果失败则提示手动复制
 if command -v curl &>/dev/null; then
