@@ -363,19 +363,40 @@ async function syncToFeishu(candidates, keyword) {
         '✅ 已自动入库 Bitable | 共入库 ' + total + ' 条'
       ].join('\n');
       
-      // 检查配置中是否有客户自己的飞书群Webhook
-      // 没有配置就不推送（保护客户数据隐私）
+      // 检查配置中是否有飞书群信息
+      // 支持两种输入格式：
+      // 1. Webhook URL（以 https://open.feishu.cn 开头）→ 用 Webhook 推送
+      // 2. 群会话 ID（以 oc_ 开头）→ 用飞书 API 推送
       const sc = loadConfig();
-      const feishuUrl = (sc.feishuWebhook || '').trim();
-      if (feishuUrl) {
-        const msgResp = await fetch(feishuUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ msg_type: 'text', content: { text } }),
-        });
-        const msgData = await msgResp.json();
-        results.group = msgData.code === 0;
-        console.log(`  飞书群通知: ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+      const feishuInput = (sc.feishuWebhook || '').trim();
+      if (feishuInput) {
+        if (feishuInput.startsWith('https://open.feishu.cn') || feishuInput.startsWith('https://open.feishu.cn')) {
+          // Webhook 方式
+          const msgResp = await fetch(feishuInput, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ msg_type: 'text', content: { text } }),
+          });
+          const msgData = await msgResp.json();
+          results.group = msgData.code === 0;
+          console.log(`  飞书群通知(Webhook): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+        } else if (feishuInput.startsWith('oc_')) {
+          // 群会话ID方式，用飞书API推送
+          const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              receive_id: feishuInput,
+              msg_type: 'text',
+              content: JSON.stringify({ text }),
+            }),
+          });
+          const msgData = await msgResp.json();
+          results.group = msgData.code === 0;
+          console.log(`  飞书群通知(API): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+        } else {
+          console.log(`  飞书群通知: 无法识别的格式，跳过推送`);
+        }
       } else {
         console.log(`  飞书群通知: 未配置，跳过推送`);
       }
