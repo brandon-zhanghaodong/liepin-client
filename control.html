@@ -428,7 +428,10 @@ async function doSearch() {
       const feishu = document.getElementById('resultFeishu');
       const bitable = document.getElementById('resultBitable');
       if (cnt) { cnt.textContent = `👤 ${result.count} 人`; cnt.className = 'result-item ok'; }
-      if (csv && result.csv) { csv.textContent = `📁 CSV 已保存`; csv.className = 'result-item ok'; }
+      if (csv && result.csv) {
+          csv.innerHTML = `📁 <a href="#" onclick="event.preventDefault(); require('electron').shell.openPath('${result.csv.replace(/'/g, "\\'")}')" style="color:var(--success);text-decoration:underline;">CSV 已保存</a>`;
+          csv.className = 'result-item ok';
+        }
       if (feishu) { feishu.textContent = result.feishu?.group ? '🌊 飞书群 ✅' : '🌊 飞书群 ❌'; feishu.className = 'result-item ' + (result.feishu?.group ? 'ok' : 'err'); }
       if (bitable) { bitable.textContent = `📊 Bitable ${result.feishu?.bitable || 0} 条`; bitable.className = 'result-item ' + (result.feishu?.bitable > 0 ? 'ok' : 'warn'); }
       

@@ -312,7 +312,6 @@ async function syncToFeishu(candidates, keyword) {
 
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const nowMs = Date.now();
-
     const records = candidates.map((c) => ({
       fields: Object.fromEntries(
         Object.entries({
@@ -324,10 +323,10 @@ async function syncToFeishu(candidates, keyword) {
           公司: c.company || '',
           职位: c.position || '',
           求职期望: c.expect || '',
-          期望薪酬: c.salary || '',
           猎聘链接: { link: c.link || '', text: '查看简历' },
           来源: '猎聘',
           应聘岗位: keyword,
+          入库时间: nowMs,
         }).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
       ),
     }));
@@ -350,7 +349,20 @@ async function syncToFeishu(candidates, keyword) {
       const preview = top.map(c =>
         `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
       ).join('\n');
-      const text = `🔍 猎聘搜索完成\n关键词: ${keyword}\n共 ${candidates.length} 人, 入库 ${total} 人\n\n📋 预览：\n${preview}`;
+      const now = new Date();
+      const timeStr = now.toLocaleString('zh-CN', { hour12: false });
+      const text = [
+        '🔍 **猎聘搜索完成**',
+        '',
+        '**关键词：** ' + keyword,
+        '**数量：** ' + candidates.length + ' 人',
+        '**时间：** ' + timeStr,
+        '',
+        '**候选人速览：**',
+        preview,
+        '',
+        '✅ 已自动入库 Bitable | 共入库 ' + total + ' 条'
+      ].join('\n');
       // 用飞书 API 发消息到群聊
       const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
         method: 'POST',
@@ -623,17 +635,39 @@ ipcMain.handle('ws:reconnect', async () => {
 ipcMain.handle('browser:open-login', async () => {
   // 打开独立 Playwright Chromium 浏览器让用户登录猎聘
   // ⚠️ 使用 chromium.launch()，绝对不碰用户的 Chrome
+  // 登录态自动保存，后续搜索带上 cookies 无需重复登录
   try {
+    const cookies = loadCookies();
     const browser = await chromium.launch({
       headless: false,
       args: ['--no-first-run', '--no-sandbox', '--disable-setuid-sandbox'],
     });
     const context = await browser.newContext();
+    // 如果有已保存的登录态，直接带上
+    if (cookies.length > 0) await context.addCookies(cookies);
     const page = await context.newPage();
     await page.goto('https://h.liepin.com/search/getConditionItem', { waitUntil: 'domcontentloaded' });
-    // 等待用户关闭浏览器或 5 分钟后自动关闭
+    
+    // 监听浏览器关闭，保存登录态
+    const checkInterval = setInterval(async () => {
+      try {
+        const pages = context.pages();
+        if (pages.length === 0 || pages.every(p => p.isClosed())) {
+          clearInterval(checkInterval);
+          await saveCookies(context);
+          await browser.close();
+          console.log('💾 登录态已保存');
+        }
+      } catch {}
+    }, 5000);
+    
+    // 5 分钟超时关闭
     setTimeout(async () => {
-      try { await context.close(); await browser.close(); } catch {}
+      clearInterval(checkInterval);
+      try {
+        await saveCookies(context);
+        await browser.close();
+      } catch {}
     }, 300000);
     return { status: 'ok' };
   } catch (e) {
