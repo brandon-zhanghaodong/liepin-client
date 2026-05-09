@@ -405,14 +405,14 @@ async function doSearch() {
 }
 
 // ── WebSocket Events ──
-ipcRenderer.on('ws-status'((data) => {
+ipcRenderer.on('ws-status', (data) => {
   const el = document.getElementById('wsStatus');
   el.textContent = data.connected ? '🟢 远程服务已连接' : '🔴 远程服务未连接';
   el.style.color = data.connected ? 'rgba(255,255,255,0.8)' : 'rgba(255,200,0,0.8)';
 });
 
-ipcRenderer.on('task-received'((data) => log(`📩 收到远程任务: ${data.keyword}`, 'bold'));
-ipcRenderer.on('task-complete'((data) => {
+ipcRenderer.on('task-received', (data) => log(`📩 收到远程任务: ${data.keyword}`, 'bold'));
+ipcRenderer.on('task-complete', (data) => {
   log(data.status === 'ok' ? `✅ 远程搜索完成: ${data.count} 人` : `❌ 远程搜索失败: ${data.message}`, data.status === 'ok' ? 'ok' : 'err');
 });
 
