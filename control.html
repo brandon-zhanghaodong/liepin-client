@@ -7,36 +7,29 @@
 <style>
 /* ── TalentOS Design System ── */
 :root {
-  --bg-primary: #f9fafb;
-  --bg-secondary: #ffffff;
-  --bg-card: #ffffff;
-  --bg-input: #f3f4f6;
-  --bg-hover: #eef2ff;
-  --border: #e5e7eb;
-  --border-focus: #6366f1;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --accent: #6366f1;
-  --accent-light: #818cf8;
-  --accent-dark: #4338ca;
-  --accent-glow: rgba(99, 102, 241, 0.12);
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --secondary: #0ea5e9;
+  --dark: #0f172a;
+  --gray: #64748b;
+  --light: #f8fafc;
+  --white: #ffffff;
+  --border: #e2e8f0;
   --success: #059669;
   --warning: #d97706;
   --error: #dc2626;
   --radius: 12px;
   --radius-sm: 8px;
-  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --transition: 0.2s ease;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--light);
+  color: var(--dark);
   font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
@@ -48,369 +41,230 @@ body {
 
 /* ── Header ── */
 .header {
-  padding: 0;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
-  border-radius: var(--radius) var(--radius) 0 0;
-  margin: 0;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
 }
-.header-inner {
-  padding: 18px 20px 14px;
-}
-.header-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 2px;
-}
-.logo {
-  width: 24px;
-  height: 24px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: white;
-  font-weight: 600;
-}
-.header h1 {
-  font-size: 15px;
-  font-weight: 600;
-  color: white;
-  letter-spacing: -0.2px;
-}
-.header .tagline {
-  font-size: 11px;
-  color: rgba(255,255,255,0.8);
-  margin-left: 34px;
-}
+.header-inner { padding: 16px 20px 12px; }
+.header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.header h1 { font-size: 15px; font-weight: 700; color: white; letter-spacing: -0.2px; }
+.header .tagline { font-size: 11px; color: rgba(255,255,255,0.8); margin-left: 0; }
 
-/* ── Environment Status ── */
-.env-bar {
-  display: flex;
-  gap: 6px;
-  padding: 0 20px 12px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.env-dot {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 500;
-}
-.env-dot.ok {
-  background: rgba(0, 214, 143, 0.1);
-  color: var(--success);
-}
-.env-dot.err {
-  background: rgba(255, 77, 77, 0.1);
-  color: var(--error);
-}
-.env-dot .circle {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-}
-.env-dot.ok .circle { background: var(--success); box-shadow: 0 0 4px rgba(0, 214, 143, 0.5); }
-.env-dot.err .circle { background: var(--error); box-shadow: 0 0 4px rgba(255, 77, 77, 0.5); }
+/* ── Env Bar ── */
+.env-bar { display: flex; gap: 6px; padding: 8px 16px 0; flex-shrink: 0; flex-wrap: wrap; }
+.env-dot { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+.env-dot.ok { background: rgba(5, 150, 105, 0.1); color: var(--success); }
+.env-dot.err { background: rgba(220, 38, 38, 0.1); color: var(--error); }
+.env-dot .circle { width: 5px; height: 5px; border-radius: 50%; }
+.env-dot.ok .circle { background: var(--success); }
+.env-dot.err .circle { background: var(--error); }
 
 /* ── Search Card ── */
 .search-card {
-  background: var(--bg-card);
+  background: var(--white);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin: 12px 16px 10px;
-  padding: 16px;
+  margin: 10px 16px 8px;
+  padding: 14px;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
 }
-
-.input-group { margin-bottom: 12px; }
-
-.input-group label {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 5px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.input-row {
-  display: flex;
-  gap: 8px;
-}
-.input-row input[type="text"] {
-  flex: 1;
-}
-.input-row input[type="number"] {
-  width: 64px;
-  text-align: center;
-}
-
+.input-group { margin-bottom: 10px; }
+.input-group label { display: block; font-size: 11px; font-weight: 600; color: var(--gray); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.input-row { display: flex; gap: 8px; }
+.input-row input[type="text"] { flex: 1; }
+.input-row input[type="number"] { width: 60px; text-align: center; }
 input {
-  background: var(--bg-input);
+  background: var(--light);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
-  color: var(--text-primary);
-  font-size: 14px;
+  padding: 8px 10px;
+  color: var(--dark);
+  font-size: 13px;
   outline: none;
-  transition: border var(--transition), box-shadow var(--transition);
+  transition: border var(--transition);
   font-family: inherit;
 }
-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-input::placeholder {
-  color: var(--text-tertiary);
-}
+input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
 
-/* ── Channel Toggle ── */
-.channel-group {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
-}
+/* ── Channel Group ── */
+.channel-group { display: flex; gap: 8px; margin-bottom: 10px; }
 .channel-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  color: var(--text-tertiary);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition);
-  font-family: inherit;
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--light); color: var(--gray); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all var(--transition); font-family: inherit;
 }
-.channel-btn:hover {
-  border-color: var(--text-secondary);
-  color: var(--text-secondary);
-}
-.channel-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-glow);
-}
-.channel-btn.active:hover {
-  border-color: var(--accent-dark);
-  color: var(--accent-dark);
-}
-.channel-btn .icon { font-size: 14px; }
+.channel-btn:hover { border-color: var(--gray); color: var(--dark); }
+.channel-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(99,102,241,0.06); }
 
 /* ── Search Button ── */
 .search-btn {
-  width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition);
-  font-family: inherit;
+  width: 100%; padding: 9px; border: none; border-radius: var(--radius-sm);
+  background: var(--primary); color: white; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all var(--transition); font-family: inherit;
 }
-.search-btn:hover {
-  background: var(--accent-dark);
-  box-shadow: var(--shadow-md);
-}
-.search-btn:active {
-  transform: translateY(0);
-}
-.search-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
+.search-btn:hover { background: var(--primary-dark); }
+.search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Progress ── */
-.progress-wrap {
-  height: 2px;
-  background: var(--bg-input);
-  border-radius: 2px;
-  margin: 10px 0 0;
-  overflow: hidden;
+.progress-wrap { height: 2px; background: var(--border); border-radius: 2px; margin: 8px 0 0; overflow: hidden; }
+.progress-bar { height: 100%; width: 0%; background: var(--primary); transition: width 0.4s ease; }
+
+/* ── Actions Bar ── */
+.actions-bar { display: flex; gap: 8px; padding: 0 16px 6px; flex-shrink: 0; }
+.actions-bar button {
+  flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--white); color: var(--gray); font-size: 11px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all var(--transition);
 }
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.4s ease;
-}
+.actions-bar button:hover { border-color: var(--primary); color: var(--primary); }
 
 /* ── Log Area ── */
 .log-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px 12px;
-  margin: 0 16px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  flex: 1; overflow-y: auto; margin: 0 16px 10px;
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 12px; box-shadow: var(--shadow);
 }
-.log-area::-webkit-scrollbar {
-  width: 4px;
-}
-.log-area::-webkit-scrollbar-track {
-  background: transparent;
-}
-.log-area::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
-.log-line {
-  padding: 1px 0;
-  font-family: 'SF Mono', 'Menlo', monospace;
-  font-size: 11px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.log-line.info { color: var(--text-secondary); }
+.log-area::-webkit-scrollbar { width: 4px; }
+.log-area::-webkit-scrollbar-track { background: transparent; }
+.log-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.log-line { padding: 1px 0; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.log-line.info { color: var(--gray); }
 .log-line.ok { color: var(--success); }
 .log-line.warn { color: var(--warning); }
 .log-line.err { color: var(--error); }
-.log-line.bold { color: var(--text-primary); font-weight: 500; }
+.log-line.bold { color: var(--dark); font-weight: 500; }
 
-/* ── Welcome / Empty State ── */
-.empty-state {
-  text-align: center;
-  padding: 24px 0;
-  color: var(--text-tertiary);
+.log-line.ok:before, .log-line.err:before, .log-line.warn:before, .log-line.bold:before {
+  content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; vertical-align: middle;
 }
-.empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+.log-line.ok:before { background: var(--success); }
+.log-line.err:before { background: var(--error); }
+.log-line.warn:before { background: var(--warning); }
+.log-line.bold:before { background: var(--primary); }
+
+.empty-state { text-align: center; padding: 20px 0; color: var(--gray); }
+.empty-state .icon { font-size: 24px; margin-bottom: 6px; }
 .empty-state p { font-size: 12px; line-height: 1.6; }
 
-/* ── Log line ambient glow ── */
-.log-line.ok:before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  background: var(--success);
-  border-radius: 50%;
-  vertical-align: middle;
+/* ── Settings Modal ── */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.3); z-index: 100;
 }
-.log-line.err:before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  background: var(--error);
-  border-radius: 50%;
-  vertical-align: middle;
+.modal-overlay.show { display: block; }
+.modal {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: var(--white); border-radius: var(--radius); width: 90%; max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15); overflow: hidden;
 }
-.log-line.warn:before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  background: var(--warning);
-  border-radius: 50%;
-  vertical-align: middle;
+.modal-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { font-size: 14px; font-weight: 600; }
+.modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--gray); padding: 0; line-height: 1; }
+.modal-body { padding: 14px 16px; max-height: 400px; overflow-y: auto; }
+.modal-body .field { margin-bottom: 12px; }
+.modal-body label { display: block; font-size: 11px; font-weight: 600; color: var(--gray); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.modal-body input[type="text"], .modal-body input[type="url"] { width: 100%; }
+.modal-body .hint { font-size: 10px; color: var(--gray); margin-top: 4px; }
+.modal-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+.modal-footer button {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
 }
-.log-line.bold:before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-  vertical-align: middle;
-}
+.btn-primary { background: var(--primary); color: white; border: none !important; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--white); color: var(--dark); }
 
-/* ── Animations ── */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.log-area .log-line:first-of-type {
-  animation: fadeIn 0.3s ease;
-}
-
-/* ── Responsive ── */
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg-primary: #f5f5f7;
-    --bg-secondary: #ffffff;
-    --bg-card: #ffffff;
-    --bg-input: #f5f5f7;
-    --bg-hover: #ebebf0;
-    --border: #d2d2d7;
-    --text-primary: #1d1d1f;
-    --text-secondary: #86868b;
-    --text-tertiary: #aeaeb2;
-  }
-}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.log-area .log-line:first-of-type { animation: fadeIn 0.3s ease; }
 </style>
 </head>
 <body>
+
+<!-- Header -->
 <div class="header">
   <div class="header-inner">
     <div class="header-top">
-      <div class="logo">🧠</div>
       <h1>招聘工厂</h1>
     </div>
     <div class="tagline" id="wsStatus">TalentOS · AI-Powered Recruitment</div>
   </div>
 </div>
 
+<!-- Status -->
 <div class="env-bar" id="envBar"></div>
 
+<!-- Search -->
 <div class="search-card">
   <div class="input-group">
     <label>搜索关键词</label>
     <div class="input-row">
-      <input type="text" id="keyword" placeholder="公司 + 职位，如：字节跳动 HRD" autofocus />
-      <input type="number" id="maxCount" value="45" min="10" max="100" title="最多获取人数" />
+      <input type="text" id="keyword" placeholder="如：字节跳动 HRD" autofocus />
+      <input type="number" id="maxCount" value="45" min="10" max="100" />
     </div>
   </div>
-
   <div class="channel-group" id="channelGroup">
-    <button class="channel-btn active" data-channel="feishu">
-      <span class="icon">🌊</span> 飞书
-    </button>
-    <button class="channel-btn" data-channel="wecom">
-      <span class="icon">💬</span> 企微
-    </button>
+    <button class="channel-btn active" data-channel="feishu">🌊 飞书</button>
+    <button class="channel-btn" data-channel="wecom">💬 企微</button>
   </div>
-
   <button class="search-btn" id="searchBtn" onclick="doSearch()">开始搜索</button>
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
 </div>
 
+<!-- Actions -->
+<div class="actions-bar">
+  <button onclick="showSettings()">⚙️ 设置</button>
+  <button onclick="electronAPI.reconnectWs()">🔄 重连</button>
+  <button id="loginBtn" onclick="openBrowserLogin()">🔑 登录猎聘</button>
+</div>
+
+<!-- Log -->
 <div class="log-area" id="logArea">
   <div class="empty-state" id="emptyState">
     <div class="icon">🔍</div>
-    <p>输入关键词，开始搜索猎聘候选人<br>结果将自动同步到所选通道</p>
+    <p>输入关键词，开始搜索猎聘候选人</p>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⚙️ 设置</h2>
+      <button class="modal-close" onclick="hideSettings()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>飞书群</label>
+        <input type="text" id="settingFeishuWebhook" placeholder="飞书群机器人 Webhook URL" />
+        <div class="hint">群设置 → 群机器人 → 复制 Webhook 地址</div>
+      </div>
+      <div class="field">
+        <label>企微群</label>
+        <input type="text" id="settingWecomWebhook" placeholder="企微群机器人 Webhook URL" />
+        <div class="hint">群设置 → 群机器人 → 复制 Webhook 地址</div>
+      </div>
+      <div class="field">
+        <label>钉钉群</label>
+        <input type="text" id="settingDingtalkWebhook" placeholder="钉钉群机器人 Webhook URL" />
+        <div class="hint">群设置 → 智能群助手 → 添加机器人 → 复制 Webhook</div>
+      </div>
+      <div class="field">
+        <label>客户端标识</label>
+        <input type="text" id="settingClientId" readonly style="background:#f0f0f0;" />
+        <div class="hint">用于服务器识别这台设备</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="hideSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">保存</button>
+    </div>
   </div>
 </div>
 
 <script>
 const { electronAPI } = window;
-let envChecked = false;
 
 // ── Logging ──
 function log(msg, tag = 'info') {
@@ -429,139 +283,111 @@ function setProgress(pct) {
   document.getElementById('progressBar').style.width = Math.min(pct, 100) + '%';
 }
 
-// ── Environment ──
+// ── Env Check ──
 async function checkEnv() {
   try {
     const result = await electronAPI.playwrightCheck();
-    const bar = document.getElementById('envBar');
-    bar.innerHTML = result.checks.map(c =>
-      `<span class="env-dot ${c.ok ? 'ok' : 'err'}">
-        <span class="circle"></span> ${c.name}
-      </span>`
+    document.getElementById('envBar').innerHTML = result.checks.map(c =>
+      `<span class="env-dot ${c.ok ? 'ok' : 'err'}"><span class="circle"></span> ${c.name}</span>`
     ).join('');
     return result.status === 'ready';
-  } catch (e) {
-    document.getElementById('envBar').innerHTML =
-      `<span class="env-dot err"><span class="circle"></span> 检测失败</span>`;
-    return false;
-  }
-}
-
-// ── Login ──
-async function checkLogin() {
-  try {
-    const result = await electronAPI.checkLogin();
-    if (result.status === 'ok') {
-      log(`✅ 登录态有效`, 'ok');
-      return true;
-    }
-    log(`⚠️ 未检测到登录态。请在猎聘页面扫码登录。`, 'warn');
-    return false;
   } catch {
-    log(`⚠️ 登录态检测失败`, 'warn');
+    document.getElementById('envBar').innerHTML = `<span class="env-dot err"><span class="circle"></span> 检测失败</span>`;
     return false;
   }
 }
 
 // ── Config ──
 async function loadConfig() {
-  try {
-    return await electronAPI.getConfig();
-  } catch { return {}; }
+  try { return await electronAPI.getConfig(); } catch { return {}; }
 }
 
 async function saveConfig(config) {
-  try {
-    await electronAPI.saveConfig(config);
-  } catch {}
+  try { await electronAPI.saveConfig(config); } catch {}
 }
 
-// ── Channel Toggle ──
+// ── Settings Modal ──
+async function showSettings() {
+  const config = await loadConfig();
+  document.getElementById('settingFeishuWebhook').value = config.feishuWebhook || '';
+  document.getElementById('settingWecomWebhook').value = config.wecomWebhook || '';
+  document.getElementById('settingDingtalkWebhook').value = config.dingtalkWebhook || '';
+  document.getElementById('settingClientId').value = config.clientId || '未注册';
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+function hideSettings() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+async function saveSettings() {
+  const config = await loadConfig();
+  config.feishuWebhook = document.getElementById('settingFeishuWebhook').value.trim();
+  config.wecomWebhook = document.getElementById('settingWecomWebhook').value.trim();
+  config.dingtalkWebhook = document.getElementById('settingDingtalkWebhook').value.trim();
+  await saveConfig(config);
+  hideSettings();
+  log('✅ 设置已保存', 'ok');
+}
+
+// ── Open Login Browser ──
+async function openBrowserLogin() {
+  log('🌐 打开猎聘登录页面（独立浏览器，不影响您的Chrome）...');
+  try {
+    await electronAPI.playwrightSearch('登录验证', 1);
+  } catch(e) {
+    log('⚠️ 请手动在独立浏览器中登录猎聘', 'warn');
+  }
+}
+
+// ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
-  const group = document.getElementById('channelGroup');
   const config = await loadConfig();
 
-  // Set initial state from config
-  if (config.channelFeishu === false) {
+  // Channel state
+  const group = document.getElementById('channelGroup');
+  if (config.channelFeishu === false)
     group.querySelector('[data-channel="feishu"]').classList.remove('active');
-  }
-  if (config.channelWecom === true) {
+  if (config.channelWecom === true)
     group.querySelector('[data-channel="wecom"]').classList.add('active');
-  }
 
   group.addEventListener('click', async (e) => {
     const btn = e.target.closest('.channel-btn');
     if (!btn) return;
+    btn.classList.toggle('active');
+    const config = await loadConfig();
     const channel = btn.dataset.channel;
-
-    if (channel === 'feishu') {
-      btn.classList.toggle('active');
-      const config = await loadConfig();
-      config.channelFeishu = btn.classList.contains('active');
-      await saveConfig(config);
-    } else if (channel === 'wecom') {
-      if (!btn.classList.contains('active')) {
-        // Activate: need webhook URL
-        const url = prompt('请输入企微群机器人 Webhook URL：\n（群设置 → 群机器人 → 复制 Webhook 地址）');
-        if (url && url.startsWith('https://qyapi.weixin.qq.com')) {
-          btn.classList.add('active');
-          const config = await loadConfig();
-          config.channelWecom = true;
-          config.wecomWebhook = url;
-          await saveConfig(config);
-          log('✅ 企微通道已配置', 'ok');
-        } else if (url) {
-          log('❌ 无效的 Webhook URL', 'err');
-        }
-      } else {
-        btn.classList.remove('active');
-        const config = await loadConfig();
-        config.channelWecom = false;
-        await saveConfig(config);
-      }
-    }
+    if (channel === 'feishu') config.channelFeishu = btn.classList.contains('active');
+    else if (channel === 'wecom') config.channelWecom = btn.classList.contains('active');
+    await saveConfig(config);
   });
 
-  // Environment check
   log('⏳ 环境检测中...');
   const envOk = await checkEnv();
   if (envOk) {
-    envChecked = true;
-    await checkLogin();
+    const login = await electronAPI.checkLogin();
+    if (login.status === 'ok') log('✅ 登录态有效', 'ok');
+    else log('⚠️ 未检测到登录态，请点击「登录猎聘」按钮', 'warn');
   }
 });
 
 // ── Search ──
 async function doSearch() {
   const keyword = document.getElementById('keyword').value.trim();
-  if (!keyword) {
-    log('⚠️ 请输入搜索关键词', 'warn');
-    document.getElementById('keyword').focus();
-    return;
-  }
-
+  if (!keyword) { log('⚠️ 请输入搜索关键词', 'warn'); return; }
   const maxCount = parseInt(document.getElementById('maxCount').value) || 45;
   const btn = document.getElementById('searchBtn');
-  btn.disabled = true;
-  btn.textContent = '搜索中...';
-
-  clearLog();
-  setProgress(10);
+  btn.disabled = true; btn.textContent = '搜索中...';
+  clearLog(); setProgress(10);
   log(`开始搜索: ${keyword}`, 'bold');
 
   try {
     const result = await electronAPI.playwrightSearch(keyword, maxCount);
     setProgress(100);
-
     if (result.status === 'ok') {
       log(`\n搜索完成 — 共 ${result.count} 人`, 'ok');
       if (result.csv) log(`CSV: ${result.csv}`, 'ok');
-      if (result.feishu) {
-        if (result.feishu.bitable > 0) log(`飞书 Bitable: ${result.feishu.bitable} 条`, 'ok');
-        if (result.feishu.group) log('飞书群通知已发送', 'ok');
-      }
-
-      log('');
+      if (result.feishu?.bitable > 0) log(`飞书 Bitable: ${result.feishu.bitable} 条`, 'ok');
       for (const c of result.candidates) {
         const parts = [c.name || '?'];
         if (c.age) parts.push(c.age + '岁');
@@ -572,43 +398,27 @@ async function doSearch() {
     } else {
       log(`\n搜索失败: ${result.message}`, 'err');
     }
-  } catch (e) {
-    log(`\n异常: ${e.message}`, 'err');
-  }
+  } catch (e) { log(`\n异常: ${e.message}`, 'err'); }
 
-  btn.disabled = false;
-  btn.textContent = '开始搜索';
+  btn.disabled = false; btn.textContent = '开始搜索';
 }
 
-// ── WebSocket 状态监听 ──
+// ── WebSocket Events ──
 electronAPI.onWsStatus((data) => {
   const el = document.getElementById('wsStatus');
-  if (data.connected) {
-    el.textContent = '🟢 服务已连接 · 7×24待命中';
-    el.style.color = 'var(--success)';
-  } else {
-    el.textContent = '🔴 服务未连接（10秒后自动重连）';
-    el.style.color = 'var(--warning)';
-  }
+  el.textContent = data.connected ? '🟢 远程服务已连接' : '🔴 远程服务未连接';
+  el.style.color = data.connected ? 'rgba(255,255,255,0.8)' : 'rgba(255,200,0,0.8)';
 });
 
-electronAPI.onTaskReceived((data) => {
-  log(`📩 收到远程任务: ${data.keyword}`, 'bold');
-});
-
+electronAPI.onTaskReceived((data) => log(`📩 收到远程任务: ${data.keyword}`, 'bold'));
 electronAPI.onTaskComplete((data) => {
-  if (data.status === 'ok') {
-    log(`✅ 远程搜索完成: ${data.count} 人`, 'ok');
-  } else {
-    log(`❌ 远程搜索失败: ${data.message}`, 'err');
-  }
+  log(data.status === 'ok' ? `✅ 远程搜索完成: ${data.count} 人` : `❌ 远程搜索失败: ${data.message}`, data.status === 'ok' ? 'ok' : 'err');
 });
 
-// Keyboard shortcut
+// Keyboard
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.activeElement?.tagName === 'INPUT') {
-    if (!document.getElementById('searchBtn').disabled) doSearch();
-  }
+  if (e.key === 'Enter' && document.activeElement?.tagName === 'INPUT' && !document.getElementById('searchBtn').disabled)
+    doSearch();
 });
 </script>
 </body>

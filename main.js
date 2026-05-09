@@ -374,11 +374,15 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
   const cookies = loadCookies();
   console.log(`  📥 登录态: ${cookies.length} cookies`);
 
+  // ⚠️ 深度记忆：必须使用 chromium.launch() 启动独立 Playwright Chromium
+  // 绝对禁止使用 connect_over_cdp() 或任何方式连接用户正在使用的 Chrome
+  // 独立浏览器在 ~/Library/Caches/ms-playwright/chromium-xxx/ 下，与用户 Chrome 完全无关
   const browser = await chromium.launch({
     headless: false,
     args: [
       '--no-first-run', '--no-sandbox', '--disable-setuid-sandbox',
       '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled',
+      '--user-data-dir=' + path.join(os.homedir(), '.liepin_client', 'playwright-profile'),
     ],
   });
 
@@ -544,7 +548,7 @@ async function checkEnvironment() {
 // ==============================================================
 
 app.whenReady().then(async () => {
-  createMainWindow();
+  // 去掉猎聘主窗口（避免用户混淆，搜索使用独立 Playwright Chromium 浏览器）
   createControlWindow();
 
   // 开机自启
@@ -554,7 +558,6 @@ app.whenReady().then(async () => {
   connectWebSocket();
 
   app.on('activate', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(); else mainWindow.show();
     if (!controlWindow || controlWindow.isDestroyed()) createControlWindow(); else controlWindow.show();
   });
 });
