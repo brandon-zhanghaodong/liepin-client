@@ -543,18 +543,20 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
     if (feishuResult.bitable > 0) console.log(`  ✅ 飞书 Bitable: ${feishuResult.bitable} 条`);
     if (feishuResult.group) console.log(`  ✅ 飞书群通知已发送`);
 
-    // 同步企微（如果配置了）
+    // 同步企微 & 钉钉（如果配置了）
     const searchConfig = loadConfig();
-    let wecomSent = false;
+    let wecomSent = false, dingtalkSent = false;
+    const now = new Date().toLocaleString('zh-CN', { hour12: false });
+    const top10 = candidates.slice(0, 10);
+    const preview = top10.map(c =>
+      `${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
+    ).join('\n');
+    
+    // 企微
     if (searchConfig.channelWecom && searchConfig.wecomWebhook) {
       try {
         console.log(`  📤 同步到企微...`);
-        const now = new Date().toLocaleString('zh-CN', { hour12: false });
-        const top10 = candidates.slice(0, 10);
-        const preview = top10.map(c =>
-          `${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
-        ).join('\n');
-        const wecomText = [
+        const text = [
           `🔍 **猎聘搜索完成 | ${now}**`,
           `**关键词：** ${keyword}`,
           `**数量：** ${candidates.length} 人`,
@@ -564,16 +566,44 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
           '',
           `✅ 已同步 Bitable`,
         ].join('\n');
-        const whResp = await fetch(searchConfig.wecomWebhook, {
+        const resp = await fetch(searchConfig.wecomWebhook, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ msgtype: 'markdown', markdown: { content: wecomText } }),
+          body: JSON.stringify({ msgtype: 'markdown', markdown: { content: text } }),
         });
-        const whData = await whResp.json();
-        wecomSent = whData.errcode === 0;
+        const data = await resp.json();
+        wecomSent = data.errcode === 0;
         console.log(`  企微通知: ${wecomSent ? '成功' : '失败'}`);
       } catch (e) {
         console.error(`  企微通知异常: ${e.message}`);
+      }
+    }
+    
+    // 钉钉
+    if (searchConfig.channelDingtalk && searchConfig.dingtalkWebhook) {
+      try {
+        console.log(`  📤 同步到钉钉...`);
+        const text = [
+          `🔍 **猎聘搜索完成 | ${now}**`,
+          ``,
+          `**关键词：** ${keyword}`,
+          `**数量：** ${candidates.length} 人`,
+          ``,
+          `**候选人速览：**`,
+          preview,
+          ``,
+          `✅ 已同步 Bitable`,
+        ].join('\n');
+        const resp = await fetch(searchConfig.dingtalkWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msgtype: 'markdown', markdown: { title: '猎聘搜索完成', text } }),
+        });
+        const data = await resp.json();
+        dingtalkSent = data.errcode === 0;
+        console.log(`  钉钉通知: ${dingtalkSent ? '成功' : '失败'}`);
+      } catch (e) {
+        console.error(`  钉钉通知异常: ${e.message}`);
       }
     }
 
@@ -586,6 +616,7 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
       candidates: candidates.slice(0, 20),
       feishu: feishuResult,
       wecom: wecomSent,
+      dingtalk: dingtalkSent,
     };
   } catch (e) {
     await browser.close().catch(() => {});
