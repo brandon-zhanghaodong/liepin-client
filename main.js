@@ -553,9 +553,11 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
     ).join('\n');
     
     // 企微
-    if (searchConfig.channelWecom && searchConfig.wecomWebhook) {
+    const wecomEnabled = searchConfig.channelWecom === true;
+    const wecomUrl = (searchConfig.wecomWebhook || '').trim();
+    console.log(`  企微通道: ${wecomEnabled ? '开启' : '关闭'}, URL: ${wecomUrl ? wecomUrl.slice(0, 50) + '...' : '未配置'}`);
+    if (wecomEnabled && wecomUrl) {
       try {
-        console.log(`  📤 同步到企微...`);
         const text = [
           `🔍 **猎聘搜索完成 | ${now}**`,
           `**关键词：** ${keyword}`,
@@ -566,23 +568,25 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
           '',
           `✅ 已同步 Bitable`,
         ].join('\n');
-        const resp = await fetch(searchConfig.wecomWebhook, {
+        const resp = await fetch(wecomUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ msgtype: 'markdown', markdown: { content: text } }),
         });
         const data = await resp.json();
         wecomSent = data.errcode === 0;
-        console.log(`  企微通知: ${wecomSent ? '成功' : '失败'}`);
+        console.log(`  企微通知: ${wecomSent ? '成功' : '失败 (errcode=' + data.errcode + ')'}`);
       } catch (e) {
         console.error(`  企微通知异常: ${e.message}`);
       }
     }
     
     // 钉钉
-    if (searchConfig.channelDingtalk && searchConfig.dingtalkWebhook) {
+    const dingtalkEnabled = searchConfig.channelDingtalk === true;
+    const dingtalkUrl = (searchConfig.dingtalkWebhook || '').trim();
+    console.log(`  钉钉通道: ${dingtalkEnabled ? '开启' : '关闭'}, URL: ${dingtalkUrl ? dingtalkUrl.slice(0, 50) + '...' : '未配置'}`);
+    if (dingtalkEnabled && dingtalkUrl) {
       try {
-        console.log(`  📤 同步到钉钉...`);
         const text = [
           `🔍 **猎聘搜索完成 | ${now}**`,
           ``,
@@ -592,16 +596,16 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
           `**候选人速览：**`,
           preview,
           ``,
-          `✅ 已同步 Bitable`,
+ `✅ 已同步 Bitable`,
         ].join('\n');
-        const resp = await fetch(searchConfig.dingtalkWebhook, {
+        const resp = await fetch(dingtalkUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ msgtype: 'markdown', markdown: { title: '猎聘搜索完成', text } }),
         });
         const data = await resp.json();
         dingtalkSent = data.errcode === 0;
-        console.log(`  钉钉通知: ${dingtalkSent ? '成功' : '失败'}`);
+        console.log(`  钉钉通知: ${dingtalkSent ? '成功' : '失败 (errcode=' + data.errcode + ')'}`);
       } catch (e) {
         console.error(`  钉钉通知异常: ${e.message}`);
       }

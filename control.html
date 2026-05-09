@@ -280,14 +280,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
 </div>
 
 <!-- 底部搜索结果栏 -->
-<div class="result-bar" id="resultBar">
-  <div class="result-item" id="resultCount">—</div>
-  <div class="result-item" id="resultCsv">—</div>
-  <div class="result-item" id="resultFeishu">—</div>
-  <div class="result-item" id="resultBitable">—</div>
-  <div class="result-item" id="resultWecom">—</div>
-  <div class="result-item" id="resultDingtalk">—</div>
-</div>
+<div class="result-bar" id="resultBar"></div>
 
 <script>
 // contextIsolation=false + nodeIntegration=true, 可以直接用 require
@@ -452,10 +445,7 @@ async function doSearch() {
       }
     } else {
       // 更新底部结果栏为失败
-      ['resultCount','resultCsv','resultFeishu','resultBitable','resultWecom','resultDingtalk'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) { el.textContent = '❌ 失败'; el.className = 'result-item err'; }
-      });
+      document.getElementById('resultBar').innerHTML = '<span class="result-item err">❌ 搜索失败</span>';
       log(`\n❌ 搜索失败: ${result.message}`, 'err');
     }
   } catch (e) { log(`\n异常: ${e.message}`, 'err'); }
