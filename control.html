@@ -208,15 +208,15 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
     <button class="channel-btn active" data-channel="feishu">🌊 飞书</button>
     <button class="channel-btn" data-channel="wecom">💬 企微</button>
   </div>
-  <button class="search-btn" id="searchBtn">开始搜索</button>
+  <button class="search-btn" id="searchBtn" onclick="doSearch()">开始搜索</button>
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
 </div>
 
 <!-- Actions -->
 <div class="actions-bar">
-  <button>⚙️ 设置</button>
-  <button>🔄 重连</button>
-  <button id="loginBtn">🔑 登录猎聘</button>
+  <button onclick="showSettings()">⚙️ 设置</button>
+  <button onclick="electronAPI.reconnectWs()">🔄 重连</button>
+  <button id="loginBtn" onclick="openBrowserLogin()">🔑 登录猎聘</button>
 </div>
 
 <!-- Log -->
@@ -232,7 +232,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
   <div class="modal">
     <div class="modal-header">
       <h2>⚙️ 设置</h2>
-      <button class="modal-close">×</button>
+      <button class="modal-close" onclick="hideSettings()">×</button>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -257,8 +257,8 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary">取消</button>
-      <button class="btn-primary">保存</button>
+      <button class="btn-secondary" onclick="hideSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">保存</button>
     </div>
   </div>
 </div>
@@ -429,6 +429,20 @@ document.querySelectorAll('.actions-bar button')[2]?.addEventListener('click', o
 document.querySelector('.modal-close')?.addEventListener('click', hideSettings);
 document.querySelectorAll('.modal-footer .btn-secondary')[0]?.addEventListener('click', hideSettings);
 document.querySelectorAll('.modal-footer .btn-primary')[0]?.addEventListener('click', saveSettings);
+
+
+
+// ── Window bindings for onclick compatibility ──
+// Electron contextIsolation模式下，<script>的function不会自动挂到window
+// 所以需要显式绑定
+window.doSearch = doSearch;
+window.showSettings = showSettings;
+window.hideSettings = hideSettings;
+window.saveSettings = saveSettings;
+window.openBrowserLogin = openBrowserLogin;
+window.log = log;
+window.clearLog = clearLog;
+window.setProgress = setProgress;
 
 </script>
 </body>
