@@ -11,7 +11,7 @@ module.exports = {
     target: [
       { target: 'dmg', arch: ['arm64', 'x64'] },
     ],
-    icon: 'assets/icon.icns',
+    icon: 'assets/icon.png',
     hardenedRuntime: true,
   },
 
