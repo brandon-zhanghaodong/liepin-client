@@ -250,38 +250,36 @@ function loadConfig() {
 //  Playwright 引擎
 // ==============================================================
 
-async function ensureChromium() {
-  // 1. 优先 Playwright 内置 Chromium
+async function detectBrowser() {
+  // 返回适合当前机器的 launch 参数：优先本机 Chrome，其次 Playwright 内置 Chromium
+  // 1. Playwright 内置 Chromium
   try {
     const p = chromium.executablePath();
     if (p && fs.existsSync(p)) {
       console.log(`✅ Playwright Chromium 就绪`);
-      return true;
+      return {};
     }
   } catch {}
 
-  // 2. 其次用客户本机已安装的 Google Chrome
+  // 2. 用户本机 Google Chrome（Mac / Windows）
   const chromePaths = process.platform === 'darwin'
     ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
     : ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'];
   for (const cp of chromePaths) {
     if (fs.existsSync(cp)) {
-      console.log(`✅ 使用本机 Chrome: ${cp}`);
-      return true;
+      console.log(`✅ 使用本机 Chrome`);
+      return { channel: 'chrome' };
     }
   }
 
-  // 3. 最后尝试自动下载
-  console.log('⏳ 未找到浏览器，尝试下载 Playwright Chromium...');
-  try {
-    execSync('npx playwright install chromium', { stdio: 'pipe', timeout: 600000 });
-    console.log('✅ Chromium 下载完成');
-    return true;
-  } catch (e) {
-    console.error('❌ 所有浏览器方案均失败');
-    return false;
-  }
+  return null;
+}
+
+async function autoInstallChromium() {
+  const config = await detectBrowser();
+  if (config) return { status: 'ready', launchConfig: config };
+  return { status: 'need_install' };
 }
 
 function loadCookies() {
@@ -401,8 +399,7 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
 
   const installResult = await autoInstallChromium();
   if (installResult.status === 'need_install') {
-    const ok = await ensureChromium();
-    if (!ok) return { status: 'error', message: 'Chromium 安装失败' };
+    return { status: 'error', message: '未找到可用浏览器，请确认已安装 Google Chrome 或运行 npx playwright install chromium' };
   }
 
   const candidates = [];
@@ -411,14 +408,14 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
 
   // ⚠️ 深度记忆：必须使用 chromium.launch() 启动独立 Playwright Chromium
   // 绝对禁止使用 connect_over_cdp() 或任何方式连接用户正在使用的 Chrome
-  // 禁止在 args 中使用 --user-data-dir（新版 Playwright 不支持，要用 launchPersistentContext）
-  const browser = await chromium.launch({
+  const launchConfig = installResult.launchConfig || {};
+  const browser = await chromium.launch(Object.assign({
     headless: false,
     args: [
       '--no-first-run', '--no-sandbox', '--disable-setuid-sandbox',
       '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled',
     ],
-  });
+  }, launchConfig));
 
   try {
     const context = await browser.newContext({
@@ -682,10 +679,12 @@ ipcMain.handle('browser:open-login', async () => {
   // 登录态自动保存，后续搜索带上 cookies 无需重复登录
   try {
     const cookies = loadCookies();
-    const browser = await chromium.launch({
+    const bc = await detectBrowser();
+    const launchOpts = Object.assign({
       headless: false,
       args: ['--no-first-run', '--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    }, bc || {});
+    const browser = await chromium.launch(launchOpts);
     const context = await browser.newContext();
     // 如果有已保存的登录态，直接带上
     if (cookies.length > 0) await context.addCookies(cookies);
