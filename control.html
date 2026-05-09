@@ -341,6 +341,19 @@ async function openBrowserLogin() {
   }
 }
 
+
+async function openCandidatesFolder() {
+  try {
+    const { shell } = require('electron');
+    const path = require('path');
+    const os = require('os');
+    const folder = path.join(os.homedir(), '.liepin_client', 'candidates');
+    shell.openPath(folder);
+  } catch(e) {
+    log('❌ 无法打开文件夹: ' + e.message, 'err');
+  }
+}
+
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
   const config = await loadConfig();
@@ -386,9 +399,11 @@ async function doSearch() {
     const result = await ipcRenderer.invoke('playwright:search', keyword, maxCount);
     setProgress(100);
     if (result.status === 'ok') {
-      log(`\n搜索完成 — 共 ${result.count} 人`, 'ok');
-      if (result.csv) log(`CSV: ${result.csv}`, 'ok');
-      if (result.feishu?.bitable > 0) log(`飞书 Bitable: ${result.feishu.bitable} 条`, 'ok');
+      log(`\n✅ 搜索完成 — 共 ${result.count} 人`, 'ok');
+      if (result.csv) log(`📁 CSV: ${result.csv}`, 'ok');
+      log(`📤 飞书群通知: ${result.feishu?.group ? '✅ 已发送' : '❌ 未发送'}`, result.feishu?.group ? 'ok' : 'err');
+      log(`📤 飞书 Bitable: ${result.feishu?.bitable || 0} 条`, result.feishu?.bitable > 0 ? 'ok' : 'warn');
+      log(``);
       for (const c of result.candidates) {
         const parts = [c.name || '?'];
         if (c.age) parts.push(c.age + '岁');
@@ -397,7 +412,7 @@ async function doSearch() {
         log('  ' + parts.join(' · '));
       }
     } else {
-      log(`\n搜索失败: ${result.message}`, 'err');
+      log(`\n❌ 搜索失败: ${result.message}`, 'err');
     }
   } catch (e) { log(`\n异常: ${e.message}`, 'err'); }
 
@@ -422,17 +437,6 @@ document.addEventListener('keydown', (e) => {
     doSearch();
 });
 
-// ── Button Binding (required for Electron contextIsolation) ──
-document.getElementById('searchBtn')?.addEventListener('click', doSearch);
-document.querySelectorAll('.actions-bar button')[0]?.addEventListener('click', showSettings);
-document.querySelectorAll('.actions-bar button')[1]?.addEventListener('click', () => ipcRenderer.invoke('ws:reconnect'));
-document.querySelectorAll('.actions-bar button')[2]?.addEventListener('click', openBrowserLogin);
-document.querySelector('.modal-close')?.addEventListener('click', hideSettings);
-document.querySelectorAll('.modal-footer .btn-secondary')[0]?.addEventListener('click', hideSettings);
-document.querySelectorAll('.modal-footer .btn-primary')[0]?.addEventListener('click', saveSettings);
-
-
-
 // ── Window bindings for onclick compatibility ──
 // Electron contextIsolation模式下，<script>的function不会自动挂到window
 // 所以需要显式绑定
@@ -441,6 +445,7 @@ window.showSettings = showSettings;
 window.hideSettings = hideSettings;
 window.saveSettings = saveSettings;
 window.openBrowserLogin = openBrowserLogin;
+window.openCandidatesFolder = openCandidatesFolder;
 window.log = log;
 window.clearLog = clearLog;
 window.setProgress = setProgress;
