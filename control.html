@@ -284,6 +284,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
   <div class="result-item" id="resultCsv">—</div>
   <div class="result-item" id="resultFeishu">—</div>
   <div class="result-item" id="resultBitable">—</div>
+  <div class="result-item" id="resultWecom">—</div>
 </div>
 
 <script>
@@ -446,7 +447,7 @@ async function doSearch() {
       }
     } else {
       // 更新底部结果栏为失败
-      ['resultCount','resultCsv','resultFeishu','resultBitable'].forEach(id => {
+      ['resultCount','resultCsv','resultFeishu','resultBitable','resultWecom'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.textContent = '❌ 失败'; el.className = 'result-item err'; }
       });
