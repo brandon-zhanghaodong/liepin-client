@@ -390,8 +390,9 @@ async function syncToFeishu(candidates, keyword) {
 }
 
 async function autoInstallChromium() {
-  const ok = await ensureChromium();
-  return ok ? { status: 'ready' } : { status: 'need_install' };
+  const config = await detectBrowser();
+  if (config) return { status: 'ready', launchConfig: config };
+  return { status: 'need_install' };
 }
 
 async function searchLiepin(keyword = 'CTO', maxResults = 45) {
