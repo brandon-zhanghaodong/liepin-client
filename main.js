@@ -342,7 +342,7 @@ async function syncToFeishu(candidates, keyword) {
     }
     results.bitable = total;
 
-    // 推送飞书群通知（用API方式，不走Webhook）
+    // 推送飞书群通知（如果配置了Webhook URL，用Webhook；否则用API方式推送到默认群）
     try {
       const top = candidates.slice(0, 10);
       const preview = top.map(c =>
@@ -362,19 +362,35 @@ async function syncToFeishu(candidates, keyword) {
         '',
         '✅ 已自动入库 Bitable | 共入库 ' + total + ' 条'
       ].join('\n');
-      // 用飞书 API 发消息到群聊
-      const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          receive_id: 'oc_d04f6841458b08b1ca4f3126c302e3d3',
-          msg_type: 'text',
-          content: JSON.stringify({ text }),
-        }),
-      });
-      const msgData = await msgResp.json();
-      results.group = msgData.code === 0;
-      console.log(`  飞书群通知: ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+      
+      // 先检查配置中是否有客户自己的飞书Webhook
+      const sc = loadConfig();
+      const feishuUrl = (sc.feishuWebhook || '').trim();
+      if (feishuUrl) {
+        // 客户配置了自己的飞书群Webhook，用Webhook方式推
+        const msgResp = await fetch(feishuUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msg_type: 'text', content: { text } }),
+        });
+        const msgData = await msgResp.json();
+        results.group = msgData.code === 0;
+        console.log(`  飞书群通知(客户Webhook): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+      } else {
+        // 没有配置，用API方式推送到默认群
+        const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receive_id: 'oc_d04f6841458b08b1ca4f3126c302e3d3',
+            msg_type: 'text',
+            content: JSON.stringify({ text }),
+          }),
+        });
+        const msgData = await msgResp.json();
+        results.group = msgData.code === 0;
+        console.log(`  飞书群通知(API): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+      }
     } catch (e) {
       console.error(`  飞书群通知异常: ${e.message}`);
     }
