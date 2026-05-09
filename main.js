@@ -251,31 +251,37 @@ function loadConfig() {
 // ==============================================================
 
 async function ensureChromium() {
+  // 1. 优先 Playwright 内置 Chromium
   try {
-    const execPath = chromium.executablePath();
-    if (execPath && fs.existsSync(execPath)) {
-      console.log(`✅ Chromium 就绪: ${execPath}`);
+    const p = chromium.executablePath();
+    if (p && fs.existsSync(p)) {
+      console.log(`✅ Playwright Chromium 就绪`);
       return true;
     }
   } catch {}
 
-  console.log('⏳ 下载 Chromium 浏览器（约 336MB，仅首次需要）...');
-  return new Promise((resolve) => {
-    const proc = spawn('npx', ['playwright', 'install', 'chromium'], {
-      stdio: ['inherit', 'pipe', 'pipe'],
-      shell: true,
-    });
-    proc.stdout.on('data', (d) => process.stdout.write(d));
-    proc.stderr.on('data', (d) => process.stderr.write(d));
-    proc.on('close', (code) => {
-      console.log(code === 0 ? '✅ Chromium 下载完成' : '❌ Chromium 下载失败');
-      resolve(code === 0);
-    });
-    proc.on('error', (e) => {
-      console.error(`❌ Chromium 下载异常: ${e.message}`);
-      resolve(false);
-    });
-  });
+  // 2. 其次用客户本机已安装的 Google Chrome
+  const chromePaths = process.platform === 'darwin'
+    ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
+    : ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+       'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'];
+  for (const cp of chromePaths) {
+    if (fs.existsSync(cp)) {
+      console.log(`✅ 使用本机 Chrome: ${cp}`);
+      return true;
+    }
+  }
+
+  // 3. 最后尝试自动下载
+  console.log('⏳ 未找到浏览器，尝试下载 Playwright Chromium...');
+  try {
+    execSync('npx playwright install chromium', { stdio: 'pipe', timeout: 600000 });
+    console.log('✅ Chromium 下载完成');
+    return true;
+  } catch (e) {
+    console.error('❌ 所有浏览器方案均失败');
+    return false;
+  }
 }
 
 function loadCookies() {
@@ -386,13 +392,8 @@ async function syncToFeishu(candidates, keyword) {
 }
 
 async function autoInstallChromium() {
-  try {
-    const execPath = chromium.executablePath();
-    if (execPath && fs.existsSync(execPath)) {
-      return { status: 'ready', message: 'Chromium 就绪' };
-    }
-  } catch {}
-  return { status: 'need_install' };
+  const ok = await ensureChromium();
+  return ok ? { status: 'ready' } : { status: 'need_install' };
 }
 
 async function searchLiepin(keyword = 'CTO', maxResults = 45) {
