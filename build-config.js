@@ -11,11 +11,8 @@ module.exports = {
     target: [
       { target: 'dmg', arch: ['arm64', 'x64'] },
     ],
-    icon: 'assets/icon.png',
+    icon: 'assets/icon.icns',
     hardenedRuntime: true,
-    extendInfo: {
-      LSUIElement: true,
-    },
   },
 
   /* ──────── Windows ──────── */

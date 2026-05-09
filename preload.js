@@ -8,4 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   playwrightCheck: () => ipcRenderer.invoke('playwright:check'),
   playwrightSearch: (keyword, maxResults) => ipcRenderer.invoke('playwright:search', keyword, maxResults),
   checkLogin: () => ipcRenderer.invoke('liepin:check'),
+
+  // 配置存储
+  getConfig: () => ipcRenderer.invoke('config:get'),
+  saveConfig: (config) => ipcRenderer.invoke('config:save', config),
 });

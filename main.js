@@ -9,6 +9,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'https://www.liepin.com/';
 const PLATFORM_NAME = '猎聘';
 const STORAGE_PATH = path.join(os.homedir(), '.liepin_client', 'liepin_storage.json');
+const CONFIG_PATH = path.join(os.homedir(), '.liepin_client', 'config.json');
 const OUTPUT_DIR = path.join(os.homedir(), '.liepin_client', 'candidates');
 const FEISHU_WEBHOOK = 'https://open.feishu.cn/open-apis/bot/v2/hook/7b488565d8454ef7a70d43f9539ec61e';
 const FEISHU_APP_ID = 'cli_a917170b57f89cd6';
@@ -51,10 +52,15 @@ let controlWindow = null;
 
 function createControlWindow() {
   controlWindow = new BrowserWindow({
-    width: 420,
-    height: 580,
+    width: 440,
+    height: 640,
+    minWidth: 380,
+    minHeight: 520,
     title: '招聘工厂 · 搜索控制台',
     icon: path.join(__dirname, 'assets', 'icon.png'),
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    show: false,
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -64,8 +70,37 @@ function createControlWindow() {
   });
 
   controlWindow.loadFile(path.join(__dirname, 'control.html'));
-
+  controlWindow.once('ready-to-show', () => controlWindow.show());
+  
+  // 点击猎聘窗口时不会隐藏控制台
   controlWindow.on('closed', () => { controlWindow = null; });
+  
+  // 阻止关闭（用户以为关的是猎聘页面）
+  controlWindow.on('close', (e) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // 如果猎聘窗口还在，点关闭控制台时最小化到dock
+      e.preventDefault();
+      controlWindow.hide();
+    }
+  });
+}
+
+// —— 保存配置 ——
+function saveConfig(config) {
+  try {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+    return true;
+  } catch { return false; }
+}
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    }
+  } catch {}
+  return {};
 }
 
 // —— 启动 ——
@@ -74,8 +109,17 @@ app.whenReady().then(() => {
   createControlWindow();
 
   app.on('activate', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
-    if (!controlWindow || controlWindow.isDestroyed()) createControlWindow();
+    // 恢复所有窗口
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow();
+    } else {
+      mainWindow.show();
+    }
+    if (!controlWindow || controlWindow.isDestroyed()) {
+      createControlWindow();
+    } else {
+      controlWindow.show();
+    }
   });
 });
 
@@ -480,11 +524,28 @@ async function searchLiepin(keyword = 'CTO', maxResults = 50) {
     fs.writeFileSync(csvPath, '\uFEFF' + csvHeader + csvRows, 'utf-8');
     console.log(`  📁 CSV: ${csvPath}`);
 
-    // 同步飞书
-    console.log('  📤 同步到飞书...');
-    const feishuResult = await syncToFeishu(candidates, keyword);
-    if (feishuResult.bitable > 0) console.log(`  ✅ 飞书 Bitable: ${feishuResult.bitable} 条`);
-    if (feishuResult.group) console.log('  ✅ 飞书群通知已发送');
+    // 同步 — 根据用户配置选择通道
+    const config = loadConfig();
+    const syncResults = {};
+    
+    if (config.channelFeishu !== false) {
+      console.log('  📤 同步到飞书...');
+      const feishuResult = await syncToFeishu(candidates, keyword);
+      if (feishuResult.bitable > 0) console.log(`  ✅ 飞书 Bitable: ${feishuResult.bitable} 条`);
+      if (feishuResult.group) console.log('  ✅ 飞书群通知已发送');
+      syncResults.feishu = feishuResult;
+    }
+    
+    if (config.channelWecom) {
+      console.log('  📤 同步到企微...');
+      try {
+        await syncToWecom(candidates, keyword, config);
+        syncResults.wecom = true;
+      } catch (e) {
+        console.error('  ❌ 企微同步失败:', e.message);
+        syncResults.wecom = false;
+      }
+    }
 
     await browser.close();
 
@@ -494,7 +555,7 @@ async function searchLiepin(keyword = 'CTO', maxResults = 50) {
       count: candidates.length,
       csv: csvPath,
       candidates: candidates.slice(0, 20),
-      feishu: feishuResult,
+      feishu: syncResults.feishu || { bitable: 0, group: false },
     };
   } catch (e) {
     await browser.close().catch(() => {});
@@ -563,6 +624,43 @@ ipcMain.handle('playwright:search', async (_event, keyword, maxResults) => {
   return await searchLiepin(keyword, maxResults);
 });
 
+/**
+ * 同步到企微
+ */
+async function syncToWecom(candidates, keyword, config) {
+  const webhook = config.wecomWebhook;
+  if (!webhook) return false;
+
+  const now = new Date().toLocaleString('zh-CN', { hour12: false });
+  const lines = [`🔍 **招聘工厂 · 猎聘搜索结果 | ${now}**`];
+  lines.push(`**关键词：** ${keyword}`);
+  lines.push(`**共找到：** ${candidates.length} 人`);
+  lines.push('');
+
+  for (let i = 0; i < Math.min(candidates.length, 10); i++) {
+    const c = candidates[i];
+    const parts = [c.name || '?'];
+    if (c.age) parts.push(`${c.age}岁`);
+    if (c.company) parts.push(c.company);
+    if (c.position) parts.push(c.position);
+    lines.push(`${i + 1}. ${parts.join(' | ')}`);
+  }
+  if (candidates.length > 10) {
+    lines.push(`\n... 共 ${candidates.length} 人`);
+  }
+
+  const resp = await fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      msgtype: 'markdown',
+      markdown: { content: lines.join('\n') },
+    }),
+  });
+  const data = await resp.json();
+  return data.errcode === 0;
+}
+
 ipcMain.handle('liepin:check', async () => {
   const cookies = loadCookies();
   return {
@@ -570,4 +668,13 @@ ipcMain.handle('liepin:check', async () => {
     cookieCount: cookies.length,
     storagePath: STORAGE_PATH,
   };
+});
+
+ipcMain.handle('config:get', async () => {
+  return loadConfig();
+});
+
+ipcMain.handle('config:save', async (_event, config) => {
+  saveConfig(config);
+  return { ok: true };
 });
