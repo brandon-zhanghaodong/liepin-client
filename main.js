@@ -320,14 +320,14 @@ async function syncToFeishu(candidates, keyword) {
           年龄: c.age ? parseInt(c.age) : null,
           工作年限: c.years || '',
           学历: c.edu || '',
-          所在城市: c.location || '',
-          当前公司: c.company || '',
-          当前职位: c.position || '',
+          所在地: c.location || '',
+          公司: c.company || '',
+          职位: c.position || '',
           求职期望: c.expect || '',
           期望薪酬: c.salary || '',
           猎聘链接: { link: c.link || '', text: '查看简历' },
-          关键词: keyword,
-          抓取时间: nowMs,
+          来源: '猎聘',
+          应聘岗位: keyword,
         }).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
       ),
     }));
@@ -344,21 +344,26 @@ async function syncToFeishu(candidates, keyword) {
     }
     results.bitable = total;
 
-    // 推送飞书群通知
+    // 推送飞书群通知（用API方式，不走Webhook）
     try {
       const top = candidates.slice(0, 10);
       const preview = top.map(c =>
         `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
       ).join('\n');
-      const msg = `🔍 猎聘搜索完成\n关键词: ${keyword}\n共 ${candidates.length} 人, 入库 ${total} 人\n\n📋 预览：\n${preview}`;
-      const whResp = await fetch('https://open.feishu.cn/open-apis/bot/v2/hook/7b488565d8454ef7a70d43f9539ec61e', {
+      const text = `🔍 猎聘搜索完成\n关键词: ${keyword}\n共 ${candidates.length} 人, 入库 ${total} 人\n\n📋 预览：\n${preview}`;
+      // 用飞书 API 发消息到群聊
+      const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg_type: 'text', content: { text: msg } }),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receive_id: 'oc_d04f6841458b08b1ca4f3126c302e3d3',
+          msg_type: 'text',
+          content: JSON.stringify({ text }),
+        }),
       });
-      const whData = await whResp.json();
-      results.group = whData.code === 0 || whData.StatusCode === 0;
-      console.log(`  飞书群通知: ${results.group ? '成功' : '失败 ' + JSON.stringify(whData)}`);
+      const msgData = await msgResp.json();
+      results.group = msgData.code === 0;
+      console.log(`  飞书群通知: ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
     } catch (e) {
       console.error(`  飞书群通知异常: ${e.message}`);
     }
