@@ -215,7 +215,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
 <!-- Actions -->
 <div class="actions-bar">
   <button onclick="showSettings()">⚙️ 设置</button>
-  <button onclick="electronAPI.reconnectWs()">🔄 重连</button>
+  <button onclick="ipcRenderer.invoke('ws:reconnect')">🔄 重连</button>
   <button id="loginBtn" onclick="openBrowserLogin()">🔑 登录猎聘</button>
 </div>
 
@@ -264,7 +264,8 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
 </div>
 
 <script>
-const { electronAPI } = window;
+// contextIsolation=false + nodeIntegration=true, 可以直接用 require
+const { ipcRenderer } = require('electron');
 
 // ── Logging ──
 function log(msg, tag = 'info') {
@@ -286,7 +287,7 @@ function setProgress(pct) {
 // ── Env Check ──
 async function checkEnv() {
   try {
-    const result = await electronAPI.playwrightCheck();
+    const result = await ipcRenderer.invoke('playwright:check');
     document.getElementById('envBar').innerHTML = result.checks.map(c =>
       `<span class="env-dot ${c.ok ? 'ok' : 'err'}"><span class="circle"></span> ${c.name}</span>`
     ).join('');
@@ -299,11 +300,11 @@ async function checkEnv() {
 
 // ── Config ──
 async function loadConfig() {
-  try { return await electronAPI.getConfig(); } catch { return {}; }
+  try { return await ipcRenderer.invoke('config:get'); } catch { return {}; }
 }
 
 async function saveConfig(config) {
-  try { await electronAPI.saveConfig(config); } catch {}
+  try { await ipcRenderer.invoke('config:save', config); } catch {}
 }
 
 // ── Settings Modal ──
@@ -334,7 +335,7 @@ async function saveSettings() {
 async function openBrowserLogin() {
   log('🌐 打开猎聘登录页面（独立浏览器，不影响您的Chrome）...');
   try {
-    await electronAPI.openLoginBrowser();
+    await ipcRenderer.invoke('browser:open-login');
   } catch(e) {
     log('⚠️ 请手动在独立浏览器中登录猎聘', 'warn');
   }
@@ -365,7 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   log('⏳ 环境检测中...');
   const envOk = await checkEnv();
   if (envOk) {
-    const login = await electronAPI.checkLogin();
+    const login = await ipcRenderer.invoke('liepin:check');
     if (login.status === 'ok') log('✅ 登录态有效', 'ok');
     else log('⚠️ 未检测到登录态，请点击「登录猎聘」按钮', 'warn');
   }
@@ -382,7 +383,7 @@ async function doSearch() {
   log(`开始搜索: ${keyword}`, 'bold');
 
   try {
-    const result = await electronAPI.playwrightSearch(keyword, maxCount);
+    const result = await ipcRenderer.invoke('playwright:search', keyword, maxCount);
     setProgress(100);
     if (result.status === 'ok') {
       log(`\n搜索完成 — 共 ${result.count} 人`, 'ok');
@@ -404,14 +405,14 @@ async function doSearch() {
 }
 
 // ── WebSocket Events ──
-electronAPI.onWsStatus((data) => {
+ipcRenderer.on('ws-status'((data) => {
   const el = document.getElementById('wsStatus');
   el.textContent = data.connected ? '🟢 远程服务已连接' : '🔴 远程服务未连接';
   el.style.color = data.connected ? 'rgba(255,255,255,0.8)' : 'rgba(255,200,0,0.8)';
 });
 
-electronAPI.onTaskReceived((data) => log(`📩 收到远程任务: ${data.keyword}`, 'bold'));
-electronAPI.onTaskComplete((data) => {
+ipcRenderer.on('task-received'((data) => log(`📩 收到远程任务: ${data.keyword}`, 'bold'));
+ipcRenderer.on('task-complete'((data) => {
   log(data.status === 'ok' ? `✅ 远程搜索完成: ${data.count} 人` : `❌ 远程搜索失败: ${data.message}`, data.status === 'ok' ? 'ok' : 'err');
 });
 
@@ -424,7 +425,7 @@ document.addEventListener('keydown', (e) => {
 // ── Button Binding (required for Electron contextIsolation) ──
 document.getElementById('searchBtn')?.addEventListener('click', doSearch);
 document.querySelectorAll('.actions-bar button')[0]?.addEventListener('click', showSettings);
-document.querySelectorAll('.actions-bar button')[1]?.addEventListener('click', () => electronAPI.reconnectWs());
+document.querySelectorAll('.actions-bar button')[1]?.addEventListener('click', () => ipcRenderer.invoke('ws:reconnect'));
 document.querySelectorAll('.actions-bar button')[2]?.addEventListener('click', openBrowserLogin);
 document.querySelector('.modal-close')?.addEventListener('click', hideSettings);
 document.querySelectorAll('.modal-footer .btn-secondary')[0]?.addEventListener('click', hideSettings);
