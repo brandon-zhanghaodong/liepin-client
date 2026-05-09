@@ -598,3 +598,24 @@ ipcMain.handle('ws:reconnect', async () => {
   connectWebSocket();
   return { ok: true };
 });
+
+ipcMain.handle('browser:open-login', async () => {
+  // 打开独立 Playwright Chromium 浏览器让用户登录猎聘
+  // ⚠️ 使用 chromium.launch()，绝对不碰用户的 Chrome
+  try {
+    const browser = await chromium.launch({
+      headless: false,
+      args: ['--no-first-run', '--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('https://h.liepin.com/search/getConditionItem', { waitUntil: 'domcontentloaded' });
+    // 等待用户关闭浏览器或 5 分钟后自动关闭
+    setTimeout(async () => {
+      try { await context.close(); await browser.close(); } catch {}
+    }, 300000);
+    return { status: 'ok' };
+  } catch (e) {
+    return { status: 'error', message: e.message };
+  }
+});

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('config:get'),
   saveConfig: (config) => ipcRenderer.invoke('config:save', config),
 
+  // 浏览器
+  openLoginBrowser: () => ipcRenderer.invoke('browser:open-login'),
+
   // WebSocket 状态
   getWsStatus: () => ipcRenderer.invoke('ws:status'),
   reconnectWs: () => ipcRenderer.invoke('ws:reconnect'),
