@@ -276,11 +276,6 @@ async function detectBrowser() {
   return null;
 }
 
-async function autoInstallChromium() {
-  const config = await detectBrowser();
-  if (config) return { status: 'ready', launchConfig: config };
-  return { status: 'need_install' };
-}
 
 function loadCookies() {
   try {
