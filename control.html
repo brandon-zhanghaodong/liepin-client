@@ -313,7 +313,7 @@ input::placeholder {
     <div class="logo">🔍</div>
     <h1>招聘工厂</h1>
   </div>
-  <div class="tagline">猎聘候选人搜索 · 本地直连</div>
+  <div class="tagline" id="wsStatus">猎聘候选人搜索 · 本地直连</div>
 </div>
 
 <div class="env-bar" id="envBar"></div>
@@ -518,6 +518,30 @@ async function doSearch() {
   btn.disabled = false;
   btn.textContent = '开始搜索';
 }
+
+// ── WebSocket 状态监听 ──
+electronAPI.onWsStatus((data) => {
+  const el = document.getElementById('wsStatus');
+  if (data.connected) {
+    el.textContent = '🟢 服务已连接 · 7×24待命中';
+    el.style.color = 'var(--success)';
+  } else {
+    el.textContent = '🔴 服务未连接（10秒后自动重连）';
+    el.style.color = 'var(--warning)';
+  }
+});
+
+electronAPI.onTaskReceived((data) => {
+  log(`📩 收到远程任务: ${data.keyword}`, 'bold');
+});
+
+electronAPI.onTaskComplete((data) => {
+  if (data.status === 'ok') {
+    log(`✅ 远程搜索完成: ${data.count} 人`, 'ok');
+  } else {
+    log(`❌ 远程搜索失败: ${data.message}`, 'err');
+  }
+});
 
 // Keyboard shortcut
 document.addEventListener('keydown', (e) => {

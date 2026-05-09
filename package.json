@@ -17,6 +17,7 @@
     "fs-extra": "^11.2.0"
   },
   "dependencies": {
-    "playwright": "^1.59.1"
+    "playwright": "^1.59.1",
+    "ws": "^8.20.0"
   }
 }
