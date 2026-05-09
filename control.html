@@ -221,6 +221,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
   <div class="channel-group" id="channelGroup">
     <button class="channel-btn active" data-channel="feishu">🌊 飞书</button>
     <button class="channel-btn" data-channel="wecom">💬 企微</button>
+    <button class="channel-btn" data-channel="dingtalk">📱 钉钉</button>
   </div>
   <button class="search-btn" id="searchBtn" onclick="doSearch()">开始搜索</button>
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
@@ -389,6 +390,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     group.querySelector('[data-channel="feishu"]').classList.remove('active');
   if (config.channelWecom === true)
     group.querySelector('[data-channel="wecom"]').classList.add('active');
+  if (config.channelDingtalk === true)
+    group.querySelector('[data-channel="dingtalk"]').classList.add('active');
 
   group.addEventListener('click', async (e) => {
     const btn = e.target.closest('.channel-btn');
@@ -398,6 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const channel = btn.dataset.channel;
     if (channel === 'feishu') config.channelFeishu = btn.classList.contains('active');
     else if (channel === 'wecom') config.channelWecom = btn.classList.contains('active');
+    else if (channel === 'dingtalk') config.channelDingtalk = btn.classList.contains('active');
     await saveConfig(config);
   });
 
