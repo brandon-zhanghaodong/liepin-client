@@ -208,10 +208,11 @@ function createControlWindow() {
     icon: path.join(__dirname, 'assets', 'icon.png'),
     resizable: true,
     show: false,
+    // 控制台窗口只加载本地control.html，安全可控，关闭隔离确保按钮可点击
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
+      contextIsolation: false,
+      nodeIntegration: true,
     },
   });
 
