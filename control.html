@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>招聘工厂 · 搜索控制台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 20px;
+  min-height: 100vh;
+}
+h1 { font-size: 20px; margin-bottom: 5px; color: #00d4ff; }
+.subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
+
+/* 搜索区 */
+.search-box {
+  background: #16213e;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; }
+input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  background: #0f3460;
+  color: #e0e0e0;
+  font-size: 15px;
+  outline: none;
+  transition: border 0.2s;
+}
+input:focus { border-color: #00d4ff; }
+.row { display: flex; gap: 12px; margin-bottom: 12px; }
+.row .field { flex: 1; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+  color: #fff;
+  width: 100%;
+  justify-content: center;
+  font-weight: 600;
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-small {
+  background: #2a2a4a;
+  color: #e0e0e0;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+.btn-small:hover { background: #3a3a5a; }
+
+/* 日志 */
+.log-area {
+  background: #0d0d1a;
+  border-radius: 12px;
+  padding: 12px;
+  height: 250px;
+  overflow-y: auto;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-line { margin: 0; }
+.log-info { color: #888; }
+.log-ok { color: #4ec9b0; }
+.log-warn { color: #cea84b; }
+.log-err { color: #f14c4c; }
+.log-bold { color: #e0e0e0; font-weight: bold; }
+
+/* 进度条 */
+.progress-wrap {
+  height: 4px;
+  background: #0d0d1a;
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* 状态栏 */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
+}
+.status-ok { color: #4ec9b0; }
+
+/* 环境检查 */
+.env-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.env-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+.env-ok { background: rgba(78, 201, 176, 0.15); color: #4ec9b0; }
+.env-err { background: rgba(241, 76, 76, 0.15); color: #f14c4c; }
+.env-loading { background: rgba(206, 168, 75, 0.15); color: #cea84b; }
+
+/* 同步选项 */
+.sync-opts { display: flex; gap: 16px; margin: 12px 0; }
+.sync-opts label { display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; }
+.sync-opts input { width: auto; }
+</style>
+</head>
+<body>
+<h1>🔍 招聘工厂 · 猎聘搜人</h1>
+<div class="subtitle">独立浏览器版 v1.2 — 本地搜索，不经过服务器</div>
+
+<div id="env-status" class="env-row"></div>
+
+<div class="search-box">
+  <div class="row">
+    <div class="field">
+      <label for="keyword">关键词</label>
+      <input type="text" id="keyword" placeholder="例如：字节跳动 HRD" />
+    </div>
+    <div class="field" style="max-width: 80px;">
+      <label for="maxCount">最多</label>
+      <input type="number" id="maxCount" value="45" min="10" max="100" />
+    </div>
+  </div>
+
+  <div class="sync-opts">
+    <label><input type="checkbox" id="syncFeishu" checked /> 飞书</label>
+    <label><input type="checkbox" id="syncBitable" checked /> Bitable</label>
+    <label><input type="checkbox" id="syncCsv" checked /> 本地CSV</label>
+  </div>
+
+  <button class="btn btn-primary" id="searchBtn" onclick="doSearch()">🔍 开始搜索</button>
+
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+</div>
+
+<div class="log-area" id="logArea">
+  <div class="log-line log-info">⏳ 环境检测中...</div>
+</div>
+
+<div class="status-bar">
+  <span id="statusText">就绪</span>
+  <span id="envDetail"></span>
+</div>
+
+<script>
+const { electronAPI } = window;
+
+// ── 日志 ──
+function log(msg, tag = 'info') {
+  const el = document.getElementById('logArea');
+  el.innerHTML += `<div class="log-line log-${tag}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '';
+}
+
+function setStatus(text, ok = true) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusText').className = ok ? 'status-ok' : '';
+}
+
+function setProgress(pct) {
+  document.getElementById('progressBar').style.width = Math.min(pct, 100) + '%';
+}
+
+// ── 环境检测 ──
+async function checkEnvironment() {
+  const envDiv = document.getElementById('env-status');
+  try {
+    const result = await electronAPI.playwrightCheck();
+    envDiv.innerHTML = result.checks.map(c =>
+      `<span class="env-tag env-${c.ok ? 'ok' : 'err'}">${c.ok ? '✅' : '❌'} ${c.name}</span>`
+    ).join('');
+    document.getElementById('envDetail').textContent =
+      result.status === 'ready' ? '✅ 全部就绪' : '⚠️ 有未通过项';
+    document.getElementById('statusText').textContent =
+      result.status === 'ready' ? '就绪，可以搜索' : '环境未就绪';
+    log(result.status === 'ready' ? '✅ 环境就绪' : '⚠️ 部分检查未通过', result.status === 'ready' ? 'ok' : 'warn');
+    return result.status === 'ready';
+  } catch (e) {
+    envDiv.innerHTML = `<span class="env-tag env-err">❌ 检测异常</span>`;
+    log(`❌ 环境检测失败: ${e.message}`, 'err');
+    return false;
+  }
+}
+
+// ── 登录态检测 ──
+async function checkLogin() {
+  try {
+    const result = await electronAPI.checkLogin();
+    if (result.status === 'ok') {
+      log(`✅ 登录态有效 (${result.cookieCount} cookies)`, 'ok');
+      return true;
+    }
+    log('⚠️ 未检测到登录态。请在猎聘页面扫码登录。', 'warn');
+    return false;
+  } catch {
+    log('⚠️ 登录态检测失败', 'warn');
+    return false;
+  }
+}
+
+// ── 搜索 ──
+async function doSearch() {
+  const keyword = document.getElementById('keyword').value.trim();
+  if (!keyword) {
+    log('⚠️ 请输入搜索关键词', 'warn');
+    document.getElementById('keyword').focus();
+    return;
+  }
+
+  const maxCount = parseInt(document.getElementById('maxCount').value) || 45;
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 搜索中...';
+
+  clearLog();
+  setProgress(0);
+  log(`🚀 开始搜索: ${keyword} (最多${maxCount}人)`, 'bold');
+
+  try {
+    const result = await electronAPI.playwrightSearch(keyword, maxCount);
+    setProgress(100);
+
+    if (result.status === 'ok') {
+      log(`\n✅ 搜索完成! 共 ${result.count} 人`, 'ok');
+      setStatus(`完成 - ${result.count}人`, true);
+
+      if (result.csv) log(`📁 CSV: ${result.csv}`, 'ok');
+      if (result.feishu) {
+        if (result.feishu.bitable > 0) log(`📤 飞书 Bitable: ${result.feishu.bitable} 条`, 'ok');
+        if (result.feishu.group) log(`📤 飞书群通知已发送`, 'ok');
+      }
+
+      log('\n📋 预览（前20人）:');
+      for (const c of result.candidates) {
+        const parts = [c.name || '?'];
+        if (c.age) parts.push(c.age + '岁');
+        if (c.company) parts.push(c.company);
+        if (c.position) parts.push(c.position);
+        log('  ' + parts.join(' | '));
+      }
+    } else {
+      log(`\n❌ 搜索失败: ${result.message}`, 'err');
+      setStatus('搜索失败', false);
+    }
+  } catch (e) {
+    log(`\n❌ 搜索异常: ${e.message}`, 'err');
+    setStatus('异常', false);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔍 开始搜索';
+}
+
+// ── 初始化 ──
+window.addEventListener('DOMContentLoaded', async () => {
+  log('⏳ 环境检测中...');
+  const envOk = await checkEnvironment();
+  if (envOk) {
+    await checkLogin();
+  }
+  document.getElementById('keyword').focus();
+});
+</script>
+</body>
+</html>

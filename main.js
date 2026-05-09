@@ -1,17 +1,25 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const { spawn, execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
+const { chromium } = require('playwright');
 
 // —— 配置 ——
 const TARGET_URL = 'https://www.liepin.com/';
 const PLATFORM_NAME = '猎聘';
+const STORAGE_PATH = path.join(os.homedir(), '.liepin_client', 'liepin_storage.json');
+const OUTPUT_DIR = path.join(os.homedir(), '.liepin_client', 'candidates');
+const FEISHU_WEBHOOK = 'https://open.feishu.cn/open-apis/bot/v2/hook/7b488565d8454ef7a70d43f9539ec61e';
+const FEISHU_APP_ID = 'cli_a917170b57f89cd6';
+const FEISHU_APP_SECRET = '5jo3BXlMlZUuwYWsdVrQQc07Rn4HM3Qz';
+const BITABLE_APP_TOKEN = 'WXHObDl8eahIVEs06phcpzPDncb';
+const BITABLE_TABLE_ID = 'tblxmUAD1XrA4XTP';
 
-// —— 创建主窗口 ——
+// —— 创建主窗口（猎聘网页）——
 let mainWindow = null;
 
-function createWindow() {
+function createMainWindow() {
   const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
@@ -38,12 +46,36 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// —— 创建控制台窗口（搜索面板）——
+let controlWindow = null;
+
+function createControlWindow() {
+  controlWindow = new BrowserWindow({
+    width: 420,
+    height: 580,
+    title: '招聘工厂 · 搜索控制台',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    resizable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  });
+
+  controlWindow.loadFile(path.join(__dirname, 'control.html'));
+
+  controlWindow.on('closed', () => { controlWindow = null; });
+}
+
 // —— 启动 ——
 app.whenReady().then(() => {
-  createWindow();
+  createMainWindow();
+  createControlWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+    if (!controlWindow || controlWindow.isDestroyed()) createControlWindow();
   });
 });
 
@@ -51,170 +83,491 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// ============ IPC: Playwright / Python 自动化 ============
+// ==============================================================
+//  Playwright 引擎（纯 Node.js，不依赖 Python）
+// ==============================================================
 
 /**
- * 获取系统 Python 路径
+ * 确保 Chromium 已安装，未安装则自动下载
  */
-function getPythonPath() {
-  const candidates = ['python3', 'python'];
-  for (const cmd of candidates) {
-    try {
-      const out = execSync(`${cmd} --version`, { encoding: 'utf-8', timeout: 3000 });
-      if (out.toLowerCase().includes('python')) {
-        return cmd;
-      }
-    } catch {}
-  }
-  return 'python3'; // fallback
-}
-
-/**
- * 运行 Python Playwright 脚本并返回 JSON
- */
-function runPythonScript(scriptName, args = []) {
-  return new Promise((resolve, reject) => {
-    const pythonPath = getPythonPath();
-    const scriptPath = path.join(
-      app.isPackaged ? path.join(process.resourcesPath, 'python') : path.join(__dirname, 'python'),
-      scriptName
-    );
-
-    if (!fs.existsSync(scriptPath)) {
-      return reject(new Error(`脚本未找到: ${scriptPath}`));
+async function ensureChromium() {
+  try {
+    const execPath = chromium.executablePath();
+    if (fs.existsSync(execPath)) {
+      console.log(`✅ Chromium 就绪: ${execPath}`);
+      return true;
     }
+  } catch {}
 
-    console.log(`🐍 运行: ${pythonPath} ${scriptPath} ${args.join(' ')}`);
-
-    const proc = spawn(pythonPath, [scriptPath, ...args], {
-      cwd: path.dirname(scriptPath),
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: '1',
-      }
+  console.log('⏳ 下载 Chromium 浏览器（约 336MB，仅首次需要）...');
+  return new Promise((resolve) => {
+    const proc = spawn('npx', ['playwright', 'install', 'chromium'], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+      shell: true,
     });
 
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr.on('data', (data) => { stderr += data.toString(); });
+    proc.stdout.on('data', (d) => process.stdout.write(d));
+    proc.stderr.on('data', (d) => process.stderr.write(d));
 
     proc.on('close', (code) => {
-      console.log(`  exit code: ${code}`);
-      if (stderr) console.warn(`  stderr: ${stderr.slice(0, 500)}`);
-
-      if (code !== 0 && !stdout.trim()) {
-        return reject(new Error(stderr || `退出码 ${code}`));
-      }
-
-      // 尝试解析 JSON 输出
-      try {
-        const jsonStart = stdout.indexOf('{');
-        if (jsonStart >= 0) {
-          const jsonStr = stdout.slice(jsonStart);
-          const result = JSON.parse(jsonStr);
-          resolve(result);
-        } else {
-          resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
-        }
-      } catch {
-        resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+      if (code === 0) {
+        console.log('✅ Chromium 下载完成');
+        resolve(true);
+      } else {
+        console.error('❌ Chromium 下载失败');
+        resolve(false);
       }
     });
 
-    proc.on('error', reject);
+    proc.on('error', (e) => {
+      console.error(`❌ Chromium 下载异常: ${e.message}`);
+      resolve(false);
+    });
   });
 }
 
 /**
- * 检查 Python + Playwright 环境
+ * 加载本地登录态
  */
-async function checkPlaywright() {
+function loadCookies() {
   try {
-    const pythonPath = getPythonPath();
-    const checkResult = execSync(`${pythonPath} -c "from playwright.sync_api import sync_playwright; print('ok')"`, {
-      timeout: 10000,
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    if (checkResult.trim() === 'ok') {
-      return { status: 'ready', message: 'Playwright 就绪' };
+    if (fs.existsSync(STORAGE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(STORAGE_PATH, 'utf-8'));
+      return data.cookies || [];
     }
-    return { status: 'error', message: 'Playwright 未正确安装' };
-  } catch (err) {
-    return { status: 'error', message: `Python/Playwright 检查失败: ${err.message}` };
+  } catch {}
+  return [];
+}
+
+/**
+ * 保存登录态
+ */
+function saveCookies(context) {
+  return context.cookies().then((cookies) => {
+    const state = { cookies, updated: new Date().toISOString() };
+    fs.mkdirSync(path.dirname(STORAGE_PATH), { recursive: true });
+    fs.writeFileSync(STORAGE_PATH, JSON.stringify(state, null, 2));
+    return cookies.length;
+  });
+}
+
+/**
+ * 同步到飞书（群 + Bitable）
+ */
+async function syncToFeishu(candidates, keyword) {
+  const results = { bitable: 0, group: false };
+  if (!candidates || candidates.length === 0) return results;
+
+  try {
+    // 获取 token
+    const tokenRes = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_id: FEISHU_APP_ID, app_secret: FEISHU_APP_SECRET }),
+    });
+    const tokenData = await tokenRes.json();
+    const token = tokenData.tenant_access_token;
+    if (!token) return results;
+
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const nowMs = Date.now();
+
+    // 批量写入 Bitable
+    const records = candidates.map((c) => ({
+      fields: Object.fromEntries(
+        Object.entries({
+          姓名: c.name || '',
+          年龄: c.age ? parseInt(c.age) : null,
+          工作年限: c.years || '',
+          学历: c.edu || '',
+          所在城市: c.location || '',
+          当前公司: c.company || '',
+          当前职位: c.position || '',
+          求职期望: c.expect || '',
+          期望薪酬: c.salary || '',
+          猎聘链接: { link: c.link || '', text: '查看简历' },
+          关键词: keyword,
+          抓取时间: nowMs,
+        }).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
+      ),
+    }));
+
+    let total = 0;
+    for (let i = 0; i < records.length; i += 20) {
+      const batch = records.slice(i, i + 20);
+      const resp = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${BITABLE_APP_TOKEN}/tables/${BITABLE_TABLE_ID}/records/batch_create`,
+        { method: 'POST', headers, body: JSON.stringify({ records: batch }) }
+      );
+      const data = await resp.json();
+      if (data.code === 0) total += batch.length;
+    }
+    results.bitable = total;
+
+    // 飞书群通知
+    const top = candidates.slice(0, 10);
+    const preview = top
+      .map((c) => `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`.trim())
+      .join('\n');
+
+    await fetch(FEISHU_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        msg_type: 'text',
+        content: {
+          text: `🔍 猎聘搜索完成\n关键词: ${keyword}\n共 ${candidates.length} 人, 入库 ${total} 人\n\n📋 预览：\n${preview}`,
+        },
+      }),
+    });
+    results.group = true;
+  } catch (e) {
+    console.error('飞书同步异常:', e.message);
+  }
+  return results;
+}
+
+/**
+ * 自动安装 Chromium（如果未安装）
+ */
+async function autoInstallChromium() {
+  try {
+    const execPath = chromium.executablePath();
+    if (execPath && fs.existsSync(execPath)) {
+      return { status: 'ready', message: 'Chromium 就绪' };
+    }
+  } catch {}
+
+  console.log('⏳ 首次运行，自动安装 Chromium 浏览器...');
+  try {
+    execSync('npx playwright install chromium', { stdio: 'inherit', timeout: 600000 });
+    return { status: 'ready', message: 'Chromium 安装完成' };
+  } catch (e) {
+    return { status: 'error', message: `安装失败: ${e.message}` };
   }
 }
 
 /**
- * 执行本地猎聘搜索
- * 调用 Python 独立浏览器脚本，不走服务器
+ * 猎聘搜索核心
  */
 async function searchLiepin(keyword = 'CTO', maxResults = 50) {
-  console.log(`🔍 本地搜索: ${keyword} (最多${maxResults}人)`);
-  
+  console.log(`🔍 搜索: ${keyword} (最多${maxResults}人)`);
+
+  // 确保 Chromium 已安装
+  const installResult = await autoInstallChromium();
+  if (installResult.status === 'error') {
+    return { status: 'error', message: installResult.message };
+  }
+
+  const candidates = [];
+  const cookies = loadCookies();
+  console.log(`  📥 登录态: ${cookies.length} cookies`);
+
+  const browser = await chromium.launch({
+    headless: false,
+    args: [
+      '--no-first-run',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+    ],
+  });
+
   try {
-    // 调用 Python 桥接脚本
-    const result = await runPythonScript('liepin_electron_search.py', [keyword, String(maxResults)]);
-    
-    if (result.status === 'ok') {
-      console.log(`✅ 搜索完成: ${result.count} 人`);
-      return result;
+    const context = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    });
+
+    if (cookies.length > 0) {
+      await context.addCookies(cookies);
     }
-    
-    return { status: 'error', message: result.message || '搜索结果为空' };
-  } catch (err) {
-    console.error(`❌ 搜索异常: ${err.message}`);
-    // 备用方案：尝试服务器 API
+
+    const page = await context.newPage();
+
+    // 导航
+    console.log('  🌐 打开猎聘找简历页面...');
+    await page.goto('https://h.liepin.com/search/getConditionItem', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
+
+    // 首次保存登录态
+    if (cookies.length === 0) {
+      const n = await saveCookies(context);
+      console.log(`  💾 登录态已保存 (${n} cookies)`);
+    }
+
+    // 清空筛选条件
     try {
-      console.log('⚠️  本地搜索失败，尝试服务器 API...');
-      const response = await fetch('http://8.135.58.6:7895/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, max_count: maxResults }),
-        signal: AbortSignal.timeout(60000),
-      });
-      const data = await response.json();
-      return data;
-    } catch (apiErr) {
-      return { status: 'error', message: `本地搜索失败: ${err.message}; 服务器回退也失败: ${apiErr.message}` };
+      const clearBtn = page.locator('text=清空筛选条件');
+      if (await clearBtn.isVisible({ timeout: 2000 })) {
+        await clearBtn.click();
+        await page.waitForTimeout(1500);
+      }
+    } catch {}
+
+    // 输入关键词
+    console.log(`  ⌨️  输入: ${keyword}`);
+    try {
+      const rc1 = page.locator('#rc_select_1');
+      await rc1.waitFor({ state: 'visible', timeout: 5000 });
+      await rc1.focus();
+      await rc1.clear();
+      await rc1.fill(keyword);
+      await page.waitForTimeout(400);
+
+      // 验证 + JS 注入备选
+      const actual = await page.evaluate("document.getElementById('rc_select_1').value");
+      if (!actual.includes(keyword)) {
+        await page.evaluate(`
+          var el = document.getElementById('rc_select_1');
+          var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          setter.call(el, '${keyword.replace(/'/g, "\\'")}');
+          el.dispatchEvent(new Event('input', {bubbles: true}));
+          el.dispatchEvent(new Event('change', {bubbles: true}));
+        `);
+        await page.waitForTimeout(400);
+      }
+    } catch (e) {
+      console.error(`  ⚠️  输入异常: ${e.message}`);
     }
+
+    // 点击搜索
+    console.log('  🔍 执行搜索...');
+    try {
+      await page.getByRole('button', { name: /搜 索/ }).click({ timeout: 5000 });
+    } catch {
+      try {
+        await page.locator('button').filter({ hasText: '搜 索' }).first().click({ timeout: 3000 });
+      } catch {
+        await page.keyboard.press('Enter');
+      }
+    }
+    await page.waitForTimeout(5000);
+
+    // 翻页提取候选人
+    const maxPages = Math.max(1, Math.ceil(maxResults / 30));
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      try {
+        await page.waitForSelector('table.new-resume-card', { timeout: 15000 });
+        await page.waitForTimeout(2000);
+      } catch {
+        console.log(`  ⚠️  第${pageNum}页无结果`);
+        break;
+      }
+
+      const rows = await page.evaluate(() => {
+        const items = [];
+        const table = document.querySelector('table.new-resume-card');
+        if (!table) return items;
+        const rows = table.querySelectorAll('tbody tr[data-tlg-ext]');
+        for (const row of rows) {
+          try {
+            const ext = row.getAttribute('data-tlg-ext') || '';
+            let resId = '';
+            try { resId = JSON.parse(decodeURIComponent(ext)).res_id || ''; } catch {}
+            if (!resId) continue;
+
+            const text = row.innerText;
+            const lines = text.split('\n').map((l) => l.trim()).filter((l) => l);
+            if (lines.length < 4) continue;
+
+            let name = '';
+            const ems = row.querySelectorAll('em');
+            for (const em of ems) {
+              const t = em.innerText.trim();
+              if (t.includes('**') && t.length <= 6 && !t.includes('活跃') && !t.includes('在线')) {
+                name = t;
+                break;
+              }
+            }
+            if (!name) continue;
+
+            let age = '', years = '', edu = '', location = '', expect = '', salary = '', company = '', position = '', active = '';
+            const first = lines[0] || '';
+            if (first.includes('今天活跃')) active = '今天活跃';
+            else if (first.includes('3天内活跃')) active = '3天内活跃';
+            else if (first.includes('7天内活跃')) active = '7天内活跃';
+            else if (first.includes('30天内活跃')) active = '30天内活跃';
+            else if (first.includes('在线')) active = '在线';
+
+            for (const l of lines) {
+              let m;
+              if (!age && l.match(/\u5c81/)) { m = l.match(/(\d+)\u5c81/); if (m) age = m[1]; }
+              if (!years && l.match(/\u5de5\u4f5c/)) { m = l.match(/\u5de5\u4f5c(\d+)\u5e74/); if (m) years = m[1]; }
+              if (!edu && l.match(/\u535a\u58eb|\u7855\u58eb|MBA|\u672c\u79d1|\u5927\u4e13/)) edu = l;
+              if (!location && (l.includes('\u533a') || l.includes('\u5e02')) && !l.includes('\u6d3b') && !l.includes('\u5728\u7ebf') && !l.includes('\u5929\u5185') && !l.includes('\u5c81') && !l.includes('\u5de5\u4f5c')) location = l;
+              if (l.includes('\u6c42\u804c\u671f\u671b')) {
+                const ex = l.split('\u6c42\u804c\u671f\u671b').pop().replace(/^[\s\u3000-\u303f]+/, '').trim();
+                if (ex) expect = ex;
+              }
+              if (!salary) { m = l.match(/\d+[kK]\s*[-~\u2013\u2014]\s*\d+[kK]/); if (m) salary = m[0]; }
+              if (l.includes('\u00b7') && (l.includes('\u516c\u53f8') || l.includes('\u79d1\u6280'))) {
+                const parts = l.split('\u00b7');
+                if (parts.length >= 2) { company = parts[0].trim(); position = parts.slice(1).join(' \u00b7 ').trim(); }
+              }
+            }
+
+            items.push({
+              name, age, years, edu, location, expect, salary, company, position, active,
+              link: 'https://h.liepin.com/resume/showresumedetail/?res_id_encode=' + resId,
+            });
+          } catch {}
+        }
+        return items;
+      });
+
+      candidates.push(...rows);
+      console.log(`  📄 第${pageNum}页: ${rows.length}人 (累计${candidates.length})`);
+
+      if (candidates.length >= maxResults) {
+        candidates.length = maxResults;
+        break;
+      }
+
+      // 翻页
+      if (pageNum < maxPages) {
+        try {
+          const nextBtn = await page.querySelector('.ant-pagination-next');
+          if (nextBtn) {
+            await nextBtn.click();
+            const delay = 5000 + Math.random() * 7000;
+            console.log(`  ➡️  翻到第${pageNum + 1}页 (等待${Math.round(delay / 1000)}s)...`);
+            await page.waitForTimeout(delay);
+          } else {
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
+    }
+
+    // 保存登录态
+    await saveCookies(context);
+
+    // 保存 CSV
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const safeKw = keyword.replace(/[^\w]/g, '_');
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    const csvPath = path.join(OUTPUT_DIR, `liepin_${safeKw}_${ts}.csv`);
+
+    const csvHeader = 'name,age,years,edu,location,company,position,expect,salary,active,link\n';
+    const csvRows = candidates
+      .map((c) =>
+        [
+          c.name || '',
+          c.age || '',
+          c.years || '',
+          c.edu || '',
+          c.location || '',
+          c.company || '',
+          c.position || '',
+          c.expect || '',
+          c.salary || '',
+          c.active || '',
+          c.link || '',
+        ]
+          .map((v) => `"${v.replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\n');
+    fs.writeFileSync(csvPath, '\uFEFF' + csvHeader + csvRows, 'utf-8');
+    console.log(`  📁 CSV: ${csvPath}`);
+
+    // 同步飞书
+    console.log('  📤 同步到飞书...');
+    const feishuResult = await syncToFeishu(candidates, keyword);
+    if (feishuResult.bitable > 0) console.log(`  ✅ 飞书 Bitable: ${feishuResult.bitable} 条`);
+    if (feishuResult.group) console.log('  ✅ 飞书群通知已发送');
+
+    await browser.close();
+
+    return {
+      status: 'ok',
+      keyword,
+      count: candidates.length,
+      csv: csvPath,
+      candidates: candidates.slice(0, 20),
+      feishu: feishuResult,
+    };
+  } catch (e) {
+    await browser.close().catch(() => {});
+    console.error(`❌ 搜索异常:`, e);
+    return { status: 'error', message: e.message };
   }
 }
 
 /**
- * 检查猎聘登录态（本地检查）
+ * 检查环境状态
  */
-async function checkLiepinLogin() {
-  // 检查本地存储的 cookie 文件
-  const storagePath = path.join(os.homedir(), '.liepin_client', 'liepin_storage.json');
+async function checkEnvironment() {
+  const results = [];
+
+  // Playwright
   try {
-    if (fs.existsSync(storagePath)) {
-      const data = JSON.parse(fs.readFileSync(storagePath, 'utf-8'));
-      const count = (data.cookies || []).length;
-      return { status: count > 0 ? 'ok' : 'empty', cookieCount: count };
-    }
-    return { status: 'not_found', message: '未找到本地登录态' };
-  } catch (err) {
-    return { status: 'error', message: err.message };
+    results.push({ name: 'Playwright', ok: true, detail: require('playwright/package.json').version });
+  } catch {
+    results.push({ name: 'Playwright', ok: false, detail: '模块未加载' });
   }
+
+  // Chromium
+  try {
+    const execPath = chromium.executablePath();
+    const exists = fs.existsSync(execPath);
+    results.push({ name: 'Chromium', ok: exists, detail: exists ? execPath : '需要下载' });
+  } catch {
+    results.push({ name: 'Chromium', ok: false, detail: '未安装' });
+  }
+
+  // 登录态
+  const cookies = loadCookies();
+  results.push({
+    name: '登录态',
+    ok: cookies.length > 0,
+    detail: cookies.length > 0 ? `${cookies.length} cookies` : '未登录',
+  });
+
+  // 网络
+  try {
+    const r = await fetch('https://h.liepin.com', { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+    results.push({ name: '网络', ok: true, detail: `猎聘可达 (${r.status})` });
+  } catch {
+    results.push({ name: '网络', ok: false, detail: '无法访问猎聘' });
+  }
+
+  return results;
 }
 
-// 注册 IPC 通道
+// ==============================================================
+//  IPC 通道
+// ==============================================================
+
 ipcMain.handle('get-platform', () => ({
   name: PLATFORM_NAME,
   url: TARGET_URL,
 }));
 
 ipcMain.handle('playwright:check', async () => {
-  return await checkPlaywright();
+  const results = await checkEnvironment();
+  const allOk = results.every((r) => r.ok);
+  return { status: allOk ? 'ready' : 'issues', checks: results };
 });
 
 ipcMain.handle('playwright:search', async (_event, keyword, maxResults) => {
   return await searchLiepin(keyword, maxResults);
 });
 
-ipcMain.handle('liepin:check-login', async () => {
-  return await checkLiepinLogin();
+ipcMain.handle('liepin:check', async () => {
+  const cookies = loadCookies();
+  return {
+    status: cookies.length > 0 ? 'ok' : 'not_found',
+    cookieCount: cookies.length,
+    storagePath: STORAGE_PATH,
+  };
 });

@@ -7,5 +7,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Playwright / 猎聘自动化
   playwrightCheck: () => ipcRenderer.invoke('playwright:check'),
   playwrightSearch: (keyword, maxResults) => ipcRenderer.invoke('playwright:search', keyword, maxResults),
-  checkLogin: () => ipcRenderer.invoke('liepin:check-login'),
+  checkLogin: () => ipcRenderer.invoke('liepin:check'),
 });

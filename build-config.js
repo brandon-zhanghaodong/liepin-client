@@ -1,6 +1,6 @@
 module.exports = {
   appId: 'com.talent-ai.liepin-client',
-  productName: '猎聘客户端',
+  productName: '招聘工厂',
   directories: {
     output: 'dist',
   },
@@ -8,8 +8,9 @@ module.exports = {
   /* ──────── Mac ──────── */
   mac: {
     category: 'public.app-category.productivity',
-    /* arch 通过 CLI --x64 / --arm64 指定 */
-    target: ['dmg'],
+    target: [
+      { target: 'dmg', arch: ['arm64', 'x64'] },
+    ],
     icon: 'assets/icon.png',
     hardenedRuntime: true,
     extendInfo: {
@@ -31,23 +32,21 @@ module.exports = {
     uninstallerIcon: 'assets/icon.ico',
   },
 
-  /* ──────── Python 脚本（extraResources，不会被打入 asar）── */
-  extraResources: [
-    {
-      from: 'python',
-      to: 'python',
-      filter: ['*.py', 'requirements.txt'],
-    }
-  ],
-
   /* ──────── 打包内容 ──────── */
   files: [
     'main.js',
     'preload.js',
+    'control.html',
     'assets/**/*',
     'node_modules/**/*',
   ],
 
+  /* ──────── asar 打包排除（playwright 的 node driver 不能放 asar 里）── */
   asar: true,
+  asarUnpack: [
+    'node_modules/playwright/**',
+    'node_modules/playwright-core/**',
+  ],
+
   publish: null,
 };
