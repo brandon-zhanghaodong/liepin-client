@@ -344,8 +344,27 @@ async function syncToFeishu(candidates, keyword) {
     }
     results.bitable = total;
 
-    // 不在这里推飞书群，由服务器统一推
-  } catch {}
+    // 推送飞书群通知
+    try {
+      const top = candidates.slice(0, 10);
+      const preview = top.map(c =>
+        `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
+      ).join('\n');
+      const msg = `🔍 猎聘搜索完成\n关键词: ${keyword}\n共 ${candidates.length} 人, 入库 ${total} 人\n\n📋 预览：\n${preview}`;
+      const whResp = await fetch('https://open.feishu.cn/open-apis/bot/v2/hook/7b488565d8454ef7a70d43f9539ec61e', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg_type: 'text', content: { text: msg } }),
+      });
+      const whData = await whResp.json();
+      results.group = whData.code === 0 || whData.StatusCode === 0;
+      console.log(`  飞书群通知: ${results.group ? '成功' : '失败 ' + JSON.stringify(whData)}`);
+    } catch (e) {
+      console.error(`  飞书群通知异常: ${e.message}`);
+    }
+  } catch (e) {
+    console.error(`  飞书同步异常: ${e.message}`);
+  }
   return results;
 }
 

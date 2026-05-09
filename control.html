@@ -119,6 +119,20 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
 }
 .actions-bar button:hover { border-color: var(--primary); color: var(--primary); }
 
+
+/* ── Result Bar ── */
+.result-bar {
+  display: flex; gap: 8px; padding: 6px 16px 10px; flex-shrink: 0; flex-wrap: wrap;
+}
+.result-item {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 8px; font-size: 10px; color: var(--gray);
+  box-shadow: var(--shadow); white-space: nowrap;
+}
+.result-item.ok { color: var(--success); border-color: var(--success); }
+.result-item.err { color: var(--error); border-color: var(--error); }
+.result-item.warn { color: var(--warning); border-color: var(--warning); }
+
 /* ── Log Area ── */
 .log-area {
   flex: 1; overflow-y: auto; margin: 0 16px 10px;
@@ -261,6 +275,15 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
       <button class="btn-primary" onclick="saveSettings()">保存</button>
     </div>
   </div>
+
+</div>
+
+<!-- 底部搜索结果栏 -->
+<div class="result-bar" id="resultBar">
+  <div class="result-item" id="resultCount">—</div>
+  <div class="result-item" id="resultCsv">—</div>
+  <div class="result-item" id="resultFeishu">—</div>
+  <div class="result-item" id="resultBitable">—</div>
 </div>
 
 <script>
@@ -399,10 +422,17 @@ async function doSearch() {
     const result = await ipcRenderer.invoke('playwright:search', keyword, maxCount);
     setProgress(100);
     if (result.status === 'ok') {
+      // 更新底部结果栏
+      const cnt = document.getElementById('resultCount');
+      const csv = document.getElementById('resultCsv');
+      const feishu = document.getElementById('resultFeishu');
+      const bitable = document.getElementById('resultBitable');
+      if (cnt) { cnt.textContent = `👤 ${result.count} 人`; cnt.className = 'result-item ok'; }
+      if (csv && result.csv) { csv.textContent = `📁 CSV 已保存`; csv.className = 'result-item ok'; }
+      if (feishu) { feishu.textContent = result.feishu?.group ? '🌊 飞书群 ✅' : '🌊 飞书群 ❌'; feishu.className = 'result-item ' + (result.feishu?.group ? 'ok' : 'err'); }
+      if (bitable) { bitable.textContent = `📊 Bitable ${result.feishu?.bitable || 0} 条`; bitable.className = 'result-item ' + (result.feishu?.bitable > 0 ? 'ok' : 'warn'); }
+      
       log(`\n✅ 搜索完成 — 共 ${result.count} 人`, 'ok');
-      if (result.csv) log(`📁 CSV: ${result.csv}`, 'ok');
-      log(`📤 飞书群通知: ${result.feishu?.group ? '✅ 已发送' : '❌ 未发送'}`, result.feishu?.group ? 'ok' : 'err');
-      log(`📤 飞书 Bitable: ${result.feishu?.bitable || 0} 条`, result.feishu?.bitable > 0 ? 'ok' : 'warn');
       log(``);
       for (const c of result.candidates) {
         const parts = [c.name || '?'];
@@ -412,6 +442,11 @@ async function doSearch() {
         log('  ' + parts.join(' · '));
       }
     } else {
+      // 更新底部结果栏为失败
+      ['resultCount','resultCsv','resultFeishu','resultBitable'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = '❌ 失败'; el.className = 'result-item err'; }
+      });
       log(`\n❌ 搜索失败: ${result.message}`, 'err');
     }
   } catch (e) { log(`\n异常: ${e.message}`, 'err'); }
