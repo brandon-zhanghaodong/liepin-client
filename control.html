@@ -219,9 +219,9 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
     </div>
   </div>
   <div class="channel-group" id="channelGroup">
-    <button class="channel-btn active" data-channel="feishu">🌊 飞书</button>
+    <button class="channel-btn" data-channel="feishu">🌊 飞书</button>
     <button class="channel-btn" data-channel="wecom">💬 企微</button>
-    <button class="channel-btn" data-channel="dingtalk">📱 钉钉</button>
+    <button class="channel-btn active" data-channel="dingtalk">📱 钉钉</button>
   </div>
   <button class="search-btn" id="searchBtn" onclick="doSearch()">开始搜索</button>
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
@@ -252,18 +252,18 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
     <div class="modal-body">
       <div class="field">
         <label>飞书群</label>
-        <input type="text" id="settingFeishuWebhook" placeholder="飞书群机器人 Webhook URL（选填）" />
-        <div class="hint">飞书群 → 设置 → 群机器人 → 添加自定义机器人 → 复制 Webhook 地址。留空则不推送飞书群。</div>
+        <input type="text" id="settingFeishuWebhook" placeholder="飞书群机器人 Webhook URL" />
+        <div class="hint">群设置 → 群机器人 → 复制 Webhook 地址</div>
       </div>
       <div class="field">
         <label>企微群</label>
-        <input type="text" id="settingWecomWebhook" placeholder="企微群机器人 Webhook URL（选填）" />
-        <div class="hint">企微群 → 设置 → 群机器人 → 添加机器人 → 复制 Webhook。留空不推送。</div>
+        <input type="text" id="settingWecomWebhook" placeholder="企微群机器人 Webhook URL" />
+        <div class="hint">群设置 → 群机器人 → 复制 Webhook 地址</div>
       </div>
       <div class="field">
         <label>钉钉群</label>
-        <input type="text" id="settingDingtalkWebhook" placeholder="钉钉群机器人 Webhook URL（选填）" />
-        <div class="hint">钉钉群 → 设置 → 智能群助手 → 添加机器人 → 复制 Webhook。留空不推送。</div>
+        <input type="text" id="settingDingtalkWebhook" placeholder="钉钉群机器人 Webhook URL" />
+        <div class="hint">群设置 → 智能群助手 → 添加机器人 → 复制 Webhook</div>
       </div>
       <div class="field">
         <label>客户端标识</label>
@@ -280,7 +280,13 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99,102,24
 </div>
 
 <!-- 底部搜索结果栏 -->
-<div class="result-bar" id="resultBar"></div>
+<div class="result-bar" id="resultBar">
+  <div class="result-item" id="resultCount">—</div>
+  <div class="result-item" id="resultCsv">—</div>
+  <div class="result-item" id="resultFeishu">—</div>
+  <div class="result-item" id="resultWecom">—</div>
+  <div class="result-item" id="resultDingtalk">—</div>
+</div>
 
 <script>
 // contextIsolation=false + nodeIntegration=true, 可以直接用 require
@@ -422,45 +428,34 @@ async function doSearch() {
     setProgress(100);
     if (result.status === 'ok') {
       // 更新底部结果栏
-      const bar = document.getElementById('resultBar');
-      bar.innerHTML = '';
-      // 人数
-      const countItem = document.createElement('span');
-      countItem.className = 'result-item ok';
-      countItem.textContent = '👤 ' + result.count + ' 人';
-      bar.appendChild(countItem);
-      // CSV
-      if (result.csv) {
-        const csvItem = document.createElement('span');
-        csvItem.className = 'result-item ok';
-        csvItem.innerHTML = '📁 <a href="#" onclick="event.preventDefault(); require(\'electron\').shell.openPath(\'' + result.csv.replace(/'/g, "\\'") + '\')" style="color:var(--success);text-decoration:underline;">CSV 已保存</a>';
-        bar.appendChild(csvItem);
+      const cnt = document.getElementById('resultCount');
+      const csv = document.getElementById('resultCsv');
+      if (cnt) { cnt.textContent = `👤 ${result.count} 人`; cnt.className = 'result-item ok'; }
+      if (csv && result.csv) {
+          csv.innerHTML = `📁 <a href="#" onclick="event.preventDefault(); require('electron').shell.openPath('${result.csv.replace(/'/g, "\\'")}')" style="color:var(--success);text-decoration:underline;">CSV 已保存</a>`;
+          csv.className = 'result-item ok';
+        }
+      const feishuEl = document.getElementById('resultFeishu');
+      const wecomEl = document.getElementById('resultWecom');
+      const dingtalkEl = document.getElementById('resultDingtalk');
+      
+      // 飞书：显示"飞书✅/❌"，取决于飞书渠道是否开启
+      const feishuBtnOn = document.querySelector('[data-channel="feishu"]')?.classList.contains('active');
+      if (feishuEl) {
+        feishuEl.textContent = feishuBtnOn ? '🌊 飞书 ✅' : '🌊 飞书 ❌';
+        feishuEl.className = 'result-item ' + (feishuBtnOn ? 'ok' : 'warn');
       }
-      // 飞书群（仅配置了才显示）
-      if (result.feishu?.group !== undefined) {
-        const feishuItem = document.createElement('span');
-        feishuItem.className = 'result-item ' + (result.feishu?.group ? 'ok' : 'err');
-        feishuItem.textContent = '🌊 ' + (result.feishu?.group ? '飞书 ✅' : '飞书 ❌');
-        bar.appendChild(feishuItem);
+      // 企微
+      const wecomBtnOn = document.querySelector('[data-channel="wecom"]')?.classList.contains('active');
+      if (wecomEl) {
+        wecomEl.textContent = wecomBtnOn ? '💬 企微 ✅' : '💬 企微 ❌';
+        wecomEl.className = 'result-item ' + (wecomBtnOn ? 'ok' : 'warn');
       }
-      // Bitable（始终显示）
-      const bitableItem = document.createElement('span');
-      bitableItem.className = 'result-item ' + (result.feishu?.bitable > 0 ? 'ok' : 'warn');
-      bitableItem.textContent = '📊 Bitable ' + (result.feishu?.bitable || 0);
-      bar.appendChild(bitableItem);
-      // 企微（仅开启时显示）
-      if (result.wecom !== undefined) {
-        const wecomItem = document.createElement('span');
-        wecomItem.className = 'result-item ' + (result.wecom ? 'ok' : 'err');
-        wecomItem.textContent = '💬 ' + (result.wecom ? '企微 ✅' : '企微 ❌');
-        bar.appendChild(wecomItem);
-      }
-      // 钉钉（仅开启时显示）
-      if (result.dingtalk !== undefined) {
-        const dingtalkItem = document.createElement('span');
-        dingtalkItem.className = 'result-item ' + (result.dingtalk ? 'ok' : 'err');
-        dingtalkItem.textContent = '📱 ' + (result.dingtalk ? '钉钉 ✅' : '钉钉 ❌');
-        bar.appendChild(dingtalkItem);
+      // 钉钉
+      const dingtalkBtnOn = document.querySelector('[data-channel="dingtalk"]')?.classList.contains('active');
+      if (dingtalkEl) {
+        dingtalkEl.textContent = dingtalkBtnOn ? '📱 钉钉 ✅' : '📱 钉钉 ❌';
+        dingtalkEl.className = 'result-item ' + (dingtalkBtnOn ? 'ok' : 'warn');
       }
       
       log(`\n✅ 搜索完成 — 共 ${result.count} 人`, 'ok');
@@ -474,7 +469,10 @@ async function doSearch() {
       }
     } else {
       // 更新底部结果栏为失败
-      document.getElementById('resultBar').innerHTML = '<span class="result-item err">❌ 搜索失败</span>';
+      ['resultCount','resultCsv','resultFeishu','resultWecom','resultDingtalk'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = '❌ 失败'; el.className = 'result-item err'; }
+      });
       log(`\n❌ 搜索失败: ${result.message}`, 'err');
     }
   } catch (e) { log(`\n异常: ${e.message}`, 'err'); }

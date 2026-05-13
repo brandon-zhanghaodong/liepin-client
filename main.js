@@ -9,6 +9,8 @@ const WebSocket = require('ws');
 // —— 配置 ——
 const TARGET_URL = 'https://www.liepin.com/';
 const WS_SERVER = 'ws://8.135.58.6:7896/ws';
+const SERVER_URL = 'http://8.135.58.6:7895';
+const CLIENT_VERSION = '1.2.12';
 const PLATFORM_NAME = '猎聘';
 const STORAGE_PATH = path.join(os.homedir(), '.liepin_client', 'liepin_storage.json');
 const CONFIG_PATH = path.join(os.homedir(), '.liepin_client', 'config.json');
@@ -295,9 +297,10 @@ function saveCookies(context) {
   });
 }
 
-async function syncToFeishu(candidates, keyword) {
-  const results = { bitable: 0, group: false };
-  if (!candidates || candidates.length === 0) return results;
+// ============== Bitable 入库（始终执行） ==============
+async function syncToBitable(candidates, keyword) {
+  const result = { bitable: 0 };
+  if (!candidates || candidates.length === 0) return result;
 
   try {
     const tokenRes = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
@@ -307,7 +310,7 @@ async function syncToFeishu(candidates, keyword) {
     });
     const tokenData = await tokenRes.json();
     const token = tokenData.tenant_access_token;
-    if (!token) return results;
+    if (!token) return result;
 
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const nowMs = Date.now();
@@ -318,13 +321,12 @@ async function syncToFeishu(candidates, keyword) {
           年龄: c.age ? parseInt(c.age) : null,
           工作年限: c.years || '',
           学历: c.edu || '',
-          所在地: c.location || '',
+          所在城市: c.location || '',
           公司: c.company || '',
           职位: c.position || '',
           求职期望: c.expect || '',
           猎聘链接: { link: c.link || '', text: '查看简历' },
-          来源: '猎聘',
-          应聘岗位: keyword,
+          关键词: keyword,
           入库时间: nowMs,
         }).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0))
       ),
@@ -340,73 +342,78 @@ async function syncToFeishu(candidates, keyword) {
       const data = await resp.json();
       if (data.code === 0) total += batch.length;
     }
-    results.bitable = total;
+    result.bitable = total;
+  } catch (e) {
+    console.error(`  飞书 Bitable 异常: ${e.message}`);
+  }
+  return result;
+}
 
-    // 推送飞书群通知（如果配置了Webhook URL，用Webhook；否则用API方式推送到默认群）
-    try {
-      const top = candidates.slice(0, 10);
-      const preview = top.map(c =>
-        `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
-      ).join('\n');
-      const now = new Date();
-      const timeStr = now.toLocaleString('zh-CN', { hour12: false });
-      const text = [
-        '🔍 **猎聘搜索完成**',
-        '',
-        '**关键词：** ' + keyword,
-        '**数量：** ' + candidates.length + ' 人',
-        '**时间：** ' + timeStr,
-        '',
-        '**候选人速览：**',
-        preview,
-        '',
-        '✅ 已自动入库 Bitable | 共入库 ' + total + ' 条'
-      ].join('\n');
-      
-      // 检查配置中是否有飞书群信息
-      // 支持两种输入格式：
-      // 1. Webhook URL（以 https://open.feishu.cn 开头）→ 用 Webhook 推送
-      // 2. 群会话 ID（以 oc_ 开头）→ 用飞书 API 推送
-      const sc = loadConfig();
-      const feishuInput = (sc.feishuWebhook || '').trim();
-      if (feishuInput) {
-        if (feishuInput.startsWith('https://open.feishu.cn') || feishuInput.startsWith('https://open.feishu.cn')) {
-          // Webhook 方式
-          const msgResp = await fetch(feishuInput, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ msg_type: 'text', content: { text } }),
-          });
-          const msgData = await msgResp.json();
-          results.group = msgData.code === 0;
-          console.log(`  飞书群通知(Webhook): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
-        } else if (feishuInput.startsWith('oc_')) {
-          // 群会话ID方式，用飞书API推送
-          const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              receive_id: feishuInput,
-              msg_type: 'text',
-              content: JSON.stringify({ text }),
-            }),
-          });
-          const msgData = await msgResp.json();
-          results.group = msgData.code === 0;
-          console.log(`  飞书群通知(API): ${results.group ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
-        } else {
-          console.log(`  飞书群通知: 无法识别的格式，跳过推送`);
-        }
-      } else {
-        console.log(`  飞书群通知: 未配置，跳过推送`);
-      }
-    } catch (e) {
-      console.error(`  飞书群通知异常: ${e.message}`);
+// ============== 飞书群通知（仅频道按钮开启时触发）==============
+async function pushToFeishuGroup(candidates, keyword, config) {
+  let groupSent = false;
+  if (!candidates || candidates.length === 0) return groupSent;
+
+  const feishuInput = (config.feishuWebhook || '').trim();
+  if (!feishuInput) {
+    console.log('  飞书群通知: 未配置 Webhook，跳过');
+    return groupSent;
+  }
+
+  try {
+    const top = candidates.slice(0, 10);
+    const preview = top.map(c =>
+      `  ${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
+    ).join('\n');
+    const now = new Date().toLocaleString('zh-CN', { hour12: false });
+    const text = [
+      '🔍 **猎聘搜索完成**',
+      '',
+      '**关键词：** ' + keyword,
+      '**数量：** ' + candidates.length + ' 人',
+      '**时间：** ' + now,
+      '',
+      '**候选人速览：**',
+      preview,
+      '',
+      '✅ 已自动入库 Bitable'
+    ].join('\n');
+
+    if (feishuInput.startsWith('https://')) {
+      const msgResp = await fetch(feishuInput, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg_type: 'text', content: { text } }),
+      });
+      const msgData = await msgResp.json();
+      groupSent = msgData.code === 0;
+      console.log(`  飞书群通知(Webhook): ${groupSent ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
+    } else if (feishuInput.startsWith('oc_')) {
+      const tokenRes = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_id: FEISHU_APP_ID, app_secret: FEISHU_APP_SECRET }),
+      });
+      const tokenData = await tokenRes.json();
+      const token = tokenData.tenant_access_token;
+      if (!token) return groupSent;
+      const msgResp = await fetch('https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receive_id: feishuInput,
+          msg_type: 'text',
+          content: JSON.stringify({ text }),
+        }),
+      });
+      const msgData = await msgResp.json();
+      groupSent = msgData.code === 0;
+      console.log(`  飞书群通知(API): ${groupSent ? '成功' : '失败 ' + JSON.stringify(msgData)}`);
     }
   } catch (e) {
-    console.error(`  飞书同步异常: ${e.message}`);
+    console.error(`  飞书群通知异常: ${e.message}`);
   }
-  return results;
+  return groupSent;
 }
 
 async function autoInstallChromium() {
@@ -489,7 +496,7 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
     }
     await page.waitForTimeout(5000);
 
-    const maxPages = Math.max(1, Math.ceil(maxResults / 30));
+    const maxPages = Math.min(5, Math.max(1, Math.ceil(maxResults / 30)));
     for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       try {
         await page.waitForSelector('table.new-resume-card', { timeout: 15000 });
@@ -563,35 +570,44 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
     fs.writeFileSync(csvPath, '\uFEFF' + csvHeader + csvRows, 'utf-8');
     console.log(`  📁 CSV: ${csvPath}`);
 
-    // 同步飞书 Bitable + 群通知
-    const feishuResult = await syncToFeishu(candidates, keyword);
-    if (feishuResult.bitable > 0) console.log(`  ✅ 飞书 Bitable: ${feishuResult.bitable} 条`);
-    if (feishuResult.group) console.log(`  ✅ 飞书群通知已发送`);
+    // ==================== Bitable 入库（始终执行） ====================
+    const bitableResult = await syncToBitable(candidates, keyword);
+    if (bitableResult.bitable > 0) console.log(`  ✅ Bitable: ${bitableResult.bitable} 条`);
 
-    // 同步企微 & 钉钉（如果配置了）
+    // ==================== 频道推送（依按钮状态） ====================
     const searchConfig = loadConfig();
-    let wecomSent = false, dingtalkSent = false;
     const now = new Date().toLocaleString('zh-CN', { hour12: false });
     const top10 = candidates.slice(0, 10);
     const preview = top10.map(c =>
       `${c.name || '?'} ${c.age ? c.age + '岁' : ''} ${c.company || ''} ${c.position || ''}`
     ).join('\n');
-    
-    // 企微
+
+    let feishuGroupSent = false, wecomSent = false, dingtalkSent = false;
+
+    // 飞书群通知（仅当按钮开启且配了 Webhook）
+    const feishuBtnOn = searchConfig.channelFeishu !== false; // 默认开启
+    if (feishuBtnOn) {
+      feishuGroupSent = await pushToFeishuGroup(candidates, keyword, searchConfig);
+    } else {
+      console.log('  飞书群通知: 按钮未开启，跳过');
+    }
+
+    // 企微群通知（需按钮开启 + Webhook 配置）
     const wecomEnabled = searchConfig.channelWecom === true;
     const wecomUrl = (searchConfig.wecomWebhook || '').trim();
-    console.log(`  企微通道: ${wecomEnabled ? '开启' : '关闭'}, URL: ${wecomUrl ? wecomUrl.slice(0, 50) + '...' : '未配置'}`);
     if (wecomEnabled && wecomUrl) {
       try {
         const text = [
-          `🔍 **猎聘搜索完成 | ${now}**`,
-          `**关键词：** ${keyword}`,
-          `**数量：** ${candidates.length} 人`,
+          '🔍 **猎聘搜索完成**',
           '',
-          `**候选人速览：**`,
+          '**关键词：** ' + keyword,
+          '**数量：** ' + candidates.length + ' 人',
+          '**时间：** ' + now,
+          '',
+          '**候选人速览：**',
           preview,
           '',
-          `✅ 已同步 Bitable`,
+          '✅ 已同步 Bitable',
         ].join('\n');
         const resp = await fetch(wecomUrl, {
           method: 'POST',
@@ -604,24 +620,47 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
       } catch (e) {
         console.error(`  企微通知异常: ${e.message}`);
       }
+    } else {
+      console.log(`  企微通知: ${!wecomEnabled ? '按钮未开启' : 'Webhook 未配置'}，跳过`);
     }
-    
-    // 钉钉
+
+    // 同步到企微智能表格（始终入库，不依赖按钮）
+    if (candidates.length > 0) {
+      try {
+        const wecomCandidates = candidates.map((c, idx) => ({
+          name: c.name || '',
+          company: c.company || '',
+          position: c.position || '',
+          location: c.location || '',
+          source: '猎聘',
+          score: 0,
+          candidateId: `LP_${Date.now()}_${idx}`,
+          note: `${c.position || ''} | ${c.years || ''} | ${c.edu || ''}`,
+        }));
+        await fetch(`${SERVER_URL}/api/sync-wecom-smartsheet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Client-Version': CLIENT_VERSION },
+          body: JSON.stringify({ candidates: wecomCandidates }),
+        }).catch(e => console.error('  企微智能表格同步异常:', e.message));
+      } catch (e) { console.error('  企微智能表格同步异常:', e.message); }
+    }
+
+    // 钉钉群通知（需按钮开启 + Webhook 配置）
     const dingtalkEnabled = searchConfig.channelDingtalk === true;
     const dingtalkUrl = (searchConfig.dingtalkWebhook || '').trim();
-    console.log(`  钉钉通道: ${dingtalkEnabled ? '开启' : '关闭'}, URL: ${dingtalkUrl ? dingtalkUrl.slice(0, 50) + '...' : '未配置'}`);
     if (dingtalkEnabled && dingtalkUrl) {
       try {
         const text = [
-          `🔍 **猎聘搜索完成 | ${now}**`,
-          ``,
-          `**关键词：** ${keyword}`,
-          `**数量：** ${candidates.length} 人`,
-          ``,
-          `**候选人速览：**`,
+          '🔍 **猎聘搜索完成**',
+          '',
+          '**关键词：** ' + keyword,
+          '**数量：** ' + candidates.length + ' 人',
+          '**时间：** ' + now,
+          '',
+          '**候选人速览：**',
           preview,
-          ``,
- `✅ 已同步 Bitable`,
+          '',
+          '✅ 已同步 Bitable',
         ].join('\n');
         const resp = await fetch(dingtalkUrl, {
           method: 'POST',
@@ -634,6 +673,29 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
       } catch (e) {
         console.error(`  钉钉通知异常: ${e.message}`);
       }
+    } else {
+      console.log(`  钉钉通知: ${!dingtalkEnabled ? '按钮未开启' : 'Webhook 未配置'}，跳过`);
+    }
+
+    // 同步到钉钉AI表格（始终入库，不依赖按钮）
+    if (candidates.length > 0) {
+      try {
+        const dingtalkCandidates = candidates.map((c, idx) => ({
+          name: c.name || '',
+          company: c.company || '',
+          position: c.position || '',
+          location: c.location || '',
+          source: '猎聘',
+          score: 0,
+          candidateId: `LP_${Date.now()}_${idx}`,
+          note: `${c.position || ''} | ${c.years || ''} | ${c.edu || ''}`,
+        }));
+        await fetch(`${SERVER_URL}/api/sync-dingtalk-ai-table`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Client-Version': CLIENT_VERSION },
+          body: JSON.stringify({ candidates: dingtalkCandidates }),
+        }).catch(e => console.error('  钉钉AI表格同步异常:', e.message));
+      } catch (e) { console.error('  钉钉AI表格同步异常:', e.message); }
     }
 
     await browser.close();
@@ -643,7 +705,7 @@ async function searchLiepin(keyword = 'CTO', maxResults = 45) {
       count: candidates.length,
       csv: csvPath,
       candidates: candidates.slice(0, 20),
-      feishu: feishuResult,
+      feishu: { bitable: bitableResult.bitable, group: feishuGroupSent },
       wecom: wecomSent,
       dingtalk: dingtalkSent,
     };
@@ -665,7 +727,9 @@ async function checkEnvironment() {
   const cookies = loadCookies();
   results.push({ name: '登录态', ok: cookies.length > 0, detail: cookies.length > 0 ? `${cookies.length} cookies` : '未登录' });
 
-  results.push({ name: '服务连接', ok: wsClient && wsClient.readyState === WebSocket.OPEN, detail: (wsClient && wsClient.readyState === WebSocket.OPEN) ? '已连接' : '未连接' });
+  // 服务连接检测（WS 可选，不影响核心功能评分）
+  const wsOk = wsClient && wsClient.readyState === WebSocket.OPEN;
+  results.push({ name: '远程服务', ok: wsOk, optional: true, detail: wsOk ? '已连接' : '离线（不影响搜索）' });
 
   try { const r = await fetch('https://h.liepin.com', { method: 'HEAD', signal: AbortSignal.timeout(5000) }); results.push({ name: '网络', ok: true, detail: `猎聘可达 (${r.status})` }); }
   catch { results.push({ name: '网络', ok: false, detail: '无法访问猎聘' }); }
@@ -678,13 +742,12 @@ async function checkEnvironment() {
 // ==============================================================
 
 app.whenReady().then(async () => {
-  // 去掉猎聘主窗口（避免用户混淆，搜索使用独立 Playwright Chromium 浏览器）
   createControlWindow();
 
   // 开机自启
   app.setLoginItemSettings({ openAtLogin: true });
 
-  // 连接 WebSocket
+  // 连接 WebSocket（自动重试，不阻塞搜索）
   connectWebSocket();
 
   app.on('activate', () => {
